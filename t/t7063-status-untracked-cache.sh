@@ -707,7 +707,7 @@ test_expect_success 'setup worktree for symlink test' '
 	git commit -m"second commit"
 '
 
-test_expect_failure '"status" after symlink replacement should be clean with UC=true' '
+test_expect_success '"status" after symlink replacement should be clean with UC=true' '
 	git checkout HEAD~ &&
 	status_is_clean &&
 	status_is_clean &&
