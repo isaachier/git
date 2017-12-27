@@ -21,6 +21,48 @@ skip_branch_tip_with_tag () {
 	fi
 }
 
+good_trees_file="$HOME/travis-cache/good-trees"
+
+# Save some info about the current commit's tree, so we can skip the build
+# job if we encounter the same tree again and can provide a useful info
+# message.
+save_good_tree () {
+	echo "$(git rev-parse $TRAVIS_COMMIT^{tree}) $TRAVIS_COMMIT $TRAVIS_JOB_NUMBER $TRAVIS_JOB_ID" >>"$good_trees_file"
+}
+
+# Skip the build job if the same tree has already been built and tested
+# successfully before (e.g. because the branch got rebased, changing only
+# the commit messages).
+skip_good_tree () {
+	if ! good_tree_info="$(grep "^$(git rev-parse $TRAVIS_COMMIT^{tree}) " "$good_trees_file")"
+	then
+		# haven't seen this tree yet; continue the build job
+		return
+	fi
+
+	echo "$good_tree_info" | {
+		read tree prev_good_commit prev_good_job_number prev_good_job_id
+
+		if test "$TRAVIS_JOB_ID" =  "$prev_good_job_id"
+		then
+			cat <<-EOF
+			Skipping build job for commit $TRAVIS_COMMIT.
+			This commit has already been built and tested successfully by this build job.
+			To force a re-build delete the branch's cache and then hit 'Restart job'.
+			EOF
+		else
+			cat <<-EOF
+			Skipping build job for commit $TRAVIS_COMMIT.
+			This commit's tree has already been built and tested successfully in build job $prev_good_job_number for commit $prev_good_commit.
+			The log of that build job is available at https://travis-ci.org/$TRAVIS_REPO_SLUG/jobs/$prev_good_job_id
+			To force a re-build delete the branch's cache and then hit 'Restart job'.
+			EOF
+		fi
+	}
+
+	exit 0
+}
+
 # Set 'exit on error' for all CI scripts to let the caller know that
 # something went wrong.
 # Set tracing executed commands, primarily setting environment variables
@@ -28,6 +70,7 @@ skip_branch_tip_with_tag () {
 set -ex
 
 skip_branch_tip_with_tag
+skip_good_tree
 
 if test -z "$jobname"
 then
