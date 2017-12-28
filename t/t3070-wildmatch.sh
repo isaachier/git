@@ -4,266 +4,535 @@ test_description='wildmatch tests'
 
 . ./test-lib.sh
 
-match() {
-    if [ $1 = 1 ]; then
-	test_expect_success "wildmatch:     match '$3' '$4'" "
-	    test-wildmatch wildmatch '$3' '$4'
-	"
-    else
-	test_expect_success "wildmatch:  no match '$3' '$4'" "
-	    ! test-wildmatch wildmatch '$3' '$4'
-	"
-    fi
+create_test_file() {
+	file=$1
+
+	case $file in
+	# `touch .` will succeed but obviously not do what we intend
+	# here.
+	".")
+		return 1
+		;;
+	# We cannot create a file with an empty filename.
+	"")
+		return 1
+		;;
+	# The tests that are testing that e.g. foo//bar is matched by
+	# foo/*/bar can't be tested on filesystems since there's no
+	# way we're getting a double slash.
+	*//*)
+		return 1
+		;;
+	# When testing the difference between foo/bar and foo/bar/ we
+	# can't test the latter.
+	*/)
+		return 1
+		;;
+	esac
+
+	# Turn foo/bar/baz into foo/bar to create foo/bar as a
+	# directory structure.
+	dirs=${file%/*}
+
+	# We touch "./$file" instead of "$file" because even an
+	# escaped "touch -- -" means get arguments from stdin.
+	if test "$file" != "$dirs"
+	then
+		mkdir -p -- "$dirs" &&
+		touch -- "./$file" &&
+		return 0
+	else
+		touch -- "./$file" &&
+		return 0
+	fi
+	return 1
 }
 
-imatch() {
-    if [ $1 = 1 ]; then
-	test_expect_success "iwildmatch:    match '$2' '$3'" "
-	    test-wildmatch iwildmatch '$2' '$3'
-	"
-    else
-	test_expect_success "iwildmatch: no match '$2' '$3'" "
-	    ! test-wildmatch iwildmatch '$2' '$3'
-	"
-    fi
+wildtest_file_setup() {
+	test_when_finished "
+		rm -rf -- * &&
+		git reset
+	" &&
+	git add -A &&
+	>expect.err
 }
 
-pathmatch() {
-    if [ $1 = 1 ]; then
-	test_expect_success "pathmatch:     match '$2' '$3'" "
-	    test-wildmatch pathmatch '$2' '$3'
-	"
-    else
-	test_expect_success "pathmatch:  no match '$2' '$3'" "
-	    ! test-wildmatch pathmatch '$2' '$3'
-	"
-    fi
+wildtest_stdout_stderr_cmp() {
+	tr -d '\0' <actual.raw >actual &&
+	test_cmp expect.err actual.err &&
+	test_cmp expect actual
 }
 
-# Basic wildmat features
-match 1 1 foo foo
-match 0 0 foo bar
-match 1 1 '' ""
-match 1 1 foo '???'
-match 0 0 foo '??'
-match 1 1 foo '*'
-match 1 1 foo 'f*'
-match 0 0 foo '*f'
-match 1 1 foo '*foo*'
-match 1 1 foobar '*ob*a*r*'
-match 1 1 aaaaaaabababab '*ab'
-match 1 1 'foo*' 'foo\*'
-match 0 0 foobar 'foo\*bar'
-match 1 1 'f\oo' 'f\\oo'
-match 1 1 ball '*[al]?'
-match 0 0 ten '[ten]'
-match 0 1 ten '**[!te]'
-match 0 0 ten '**[!ten]'
-match 1 1 ten 't[a-g]n'
-match 0 0 ten 't[!a-g]n'
-match 1 1 ton 't[!a-g]n'
-match 1 1 ton 't[^a-g]n'
-match 1 x 'a]b' 'a[]]b'
-match 1 x a-b 'a[]-]b'
-match 1 x 'a]b' 'a[]-]b'
-match 0 x aab 'a[]-]b'
-match 1 x aab 'a[]a-]b'
-match 1 1 ']' ']'
+wildtest() {
+	if test "$#" = 6
+	then
+		# When test-wildmatch and git ls-files produce the same
+		# result.
+		match_w_glob=$1
+		match_f_w_glob=$match_w_glob
+		match_w_globi=$2
+		match_f_w_globi=$match_w_globi
+		match_w_pathmatch=$3
+		match_f_w_pathmatch=$match_w_pathmatch
+		match_w_pathmatchi=$4
+		match_f_w_pathmatchi=$match_w_pathmatchi
+		text=$5
+		pattern=$6
+	elif test "$#" = 10
+	then
+		match_w_glob=$1
+		match_w_globi=$2
+		match_w_pathmatch=$3
+		match_w_pathmatchi=$4
+		match_f_w_glob=$5
+		match_f_w_globi=$6
+		match_f_w_pathmatch=$7
+		match_f_w_pathmatchi=$8
+		text=$9
+		pattern=$10
+	fi
+
+	# $1: Case sensitive glob match: test-wildmatch
+	if test "$match_w_glob" = 1
+	then
+		test_expect_success "wildmatch: match '$text' '$pattern'" "
+			test-wildmatch wildmatch '$text' '$pattern'
+		"
+	elif test "$match_w_glob" = 0
+	then
+		test_expect_success "wildmatch: no match '$text' '$pattern'" "
+			! test-wildmatch wildmatch '$text' '$pattern'
+		"
+	else
+		test_expect_success "PANIC: Test framework error. Unknown matches value $match_w_glob" 'false'
+	fi
+
+	# $1: Case sensitive glob match: ls-files
+	if test "$match_f_w_glob" = 'E'
+	then
+		if create_test_file "$text"
+		then
+			test_expect_success "wildmatch(ls): match dies on '$pattern' '$text'" "
+				wildtest_file_setup &&
+				printf '%s' '$text' >expect &&
+				test_must_fail git --glob-pathspecs ls-files -z -- '$pattern'
+			"
+		else
+			test_expect_failure "wildmatch(ls): match skip '$pattern' '$text'" 'false'
+		fi
+	elif test "$match_f_w_glob" = 1
+	then
+		if create_test_file "$text"
+		then
+			test_expect_success "wildmatch(ls): match '$pattern' '$text'" "
+				wildtest_file_setup &&
+				printf '%s' '$text' >expect &&
+				git --glob-pathspecs ls-files -z -- '$pattern' >actual.raw 2>actual.err &&
+				wildtest_stdout_stderr_cmp
+			"
+		else
+			test_expect_failure "wildmatch(ls): match skip '$pattern' '$text'" 'false'
+		fi
+	elif test "$match_f_w_glob" = 0
+	then
+		if create_test_file "$text"
+		then
+			test_expect_success "wildmatch(ls): no match '$pattern' '$text'" "
+				wildtest_file_setup &&
+				>expect &&
+				git --glob-pathspecs ls-files -z -- '$pattern' >actual.raw 2>actual.err &&
+				wildtest_stdout_stderr_cmp
+			"
+		else
+			test_expect_failure "wildmatch(ls): no match skip '$pattern' '$text'" 'false'
+		fi
+	else
+		test_expect_success "PANIC: Test framework error. Unknown matches value $match_f_w_glob" 'false'
+	fi
+
+	# $2: Case insensitive glob match: test-wildmatch
+	if test "$match_w_globi" = 1
+	then
+		test_expect_success "iwildmatch: match '$text' '$pattern'" "
+			test-wildmatch iwildmatch '$text' '$pattern'
+		"
+	elif test "$match_w_globi" = 0
+	then
+		test_expect_success "iwildmatch: no match '$text' '$pattern'" "
+			! test-wildmatch iwildmatch '$text' '$pattern'
+		"
+	else
+		test_expect_success "PANIC: Test framework error. Unknown matches value $match_w_globi" 'false'
+	fi
+
+	# $2: Case insensitive glob match: ls-files
+	if test "$match_f_w_globi" = 'E'
+	then
+		if create_test_file "$text"
+		then
+			test_expect_success "wildmatch(ls): match dies on '$pattern' '$text'" "
+				wildtest_file_setup &&
+				printf '%s' '$text' >expect &&
+				test_must_fail git --glob-pathspecs --icase-pathspecs ls-files -z -- '$pattern'
+			"
+		else
+			test_expect_failure "wildmatch(ls): match skip '$pattern' '$text'" 'false'
+		fi
+	elif test "$match_f_w_globi" = 1
+	then
+		if create_test_file "$text"
+		then
+			test_expect_success "wildmatch(ls): match '$pattern' '$text'" "
+				wildtest_file_setup &&
+				printf '%s' '$text' >expect &&
+				git --glob-pathspecs --icase-pathspecs ls-files -z -- '$pattern' >actual.raw 2>actual.err &&
+				wildtest_stdout_stderr_cmp
+			"
+		else
+			test_expect_failure "wildmatch(ls): match skip '$pattern' '$text'" 'false'
+		fi
+	elif test "$match_f_w_globi" = 0
+	then
+		if create_test_file "$text"
+		then
+			test_expect_success "wildmatch(ls): no match '$pattern' '$text'" "
+				wildtest_file_setup &&
+				>expect &&
+				git --glob-pathspecs --icase-pathspecs ls-files -z -- '$pattern' >actual.raw 2>actual.err &&
+				wildtest_stdout_stderr_cmp
+			"
+		else
+			test_expect_failure "wildmatch(ls): no match skip '$pattern' '$text'" 'false'
+		fi
+	else
+		test_expect_success "PANIC: Test framework error. Unknown matches value $match_f_w_globi" 'false'
+	fi
+
+	# $3: Case sensitive path match: test-wildmatch
+	if test "$match_w_pathmatch" = 1
+	then
+		test_expect_success "pathmatch: match '$text' '$pattern'" "
+			test-wildmatch pathmatch '$text' '$pattern'
+		"
+	elif test "$match_w_pathmatch" = 0
+	then
+		test_expect_success "pathmatch: no match '$text' '$pattern'" "
+			! test-wildmatch pathmatch '$text' '$pattern'
+		"
+	else
+		test_expect_success "PANIC: Test framework error. Unknown matches value $match_w_pathmatch" 'false'
+	fi
+
+	# $4: Case sensitive path match: ls-files
+	if test "$match_f_w_pathmatch" = 'E'
+	then
+		if create_test_file "$text"
+		then
+			test_expect_success "pathmatch(ls): match dies on '$pattern' '$text'" "
+				wildtest_file_setup &&
+				printf '%s' '$text' >expect &&
+				test_must_fail git ls-files -z -- '$pattern'
+			"
+		else
+			test_expect_failure "pathmatch(ls): match skip '$pattern' '$text'" 'false'
+		fi
+	elif test "$match_f_w_pathmatch" = 1
+	then
+		if create_test_file "$text"
+		then
+			test_expect_success "pathmatch(ls): match '$pattern' '$text'" "
+				wildtest_file_setup &&
+				printf '%s' '$text' >expect &&
+				git ls-files -z -- '$pattern' >actual.raw 2>actual.err &&
+				wildtest_stdout_stderr_cmp
+			"
+		else
+			test_expect_failure "pathmatch(ls): match skip '$pattern' '$text'" 'false'
+		fi
+	elif test "$match_f_w_pathmatch" = 0
+	then
+		if create_test_file "$text"
+		then
+			test_expect_success "pathmatch(ls): no match '$pattern' '$text'" "
+				wildtest_file_setup &&
+				>expect &&
+				git ls-files -z -- '$pattern' >actual.raw 2>actual.err &&
+				wildtest_stdout_stderr_cmp
+			"
+		else
+			test_expect_failure "pathmatch(ls): no match skip '$pattern' '$text'" 'false'
+		fi
+	else
+		test_expect_success "PANIC: Test framework error. Unknown matches value $match_f_w_pathmatch" 'false'
+	fi
+
+	# $4: Case insensitive path match: test-wildmatch
+	if test "$match_w_pathmatchi" = 1
+	then
+		test_expect_success "ipathmatch: match '$text' '$pattern'" "
+			test-wildmatch ipathmatch '$text' '$pattern'
+		"
+	elif test "$match_w_pathmatchi" = 0
+	then
+		test_expect_success "ipathmatch: no match '$text' '$pattern'" "
+			! test-wildmatch ipathmatch '$text' '$pattern'
+		"
+	else
+		test_expect_success "PANIC: Test framework error. Unknown matches value $match_w_pathmatchi" 'false'
+	fi
+
+	# $4: Case insensitive path match: ls-files
+	if test "$match_f_w_pathmatchi" = 'E'
+	then
+		if create_test_file "$text"
+		then
+			test_expect_success "ipathmatch(ls): match dies on '$pattern' '$text'" "
+				wildtest_file_setup &&
+				printf '%s' '$text' >expect &&
+				test_must_fail git --icase-pathspecs ls-files -z -- '$pattern'
+			"
+		else
+			test_expect_failure "pathmatch(ls): match skip '$pattern' '$text'" 'false'
+		fi
+	elif test "$match_f_w_pathmatchi" = 1
+	then
+		if create_test_file "$text"
+		then
+			test_expect_success "ipathmatch(ls): match '$pattern' '$text'" "
+				wildtest_file_setup &&
+				printf '%s' '$text' >expect &&
+				git --icase-pathspecs ls-files -z -- '$pattern' >actual.raw 2>actual.err &&
+				wildtest_stdout_stderr_cmp
+			"
+		else
+			test_expect_failure "pathmatch(ls): match skip '$pattern' '$text'" 'false'
+		fi
+	elif test "$match_f_w_pathmatchi" = 0
+	then
+		if create_test_file "$text"
+		then
+			test_expect_success "ipathmatch(ls): no match '$pattern' '$text'" "
+				wildtest_file_setup &&
+				>expect &&
+				git ls-files -z -- '$pattern' >actual.raw 2>actual.err &&
+				wildtest_stdout_stderr_cmp
+			"
+		else
+			test_expect_failure "pathmatch(ls): no match skip '$pattern' '$text'" 'false'
+		fi
+	else
+		test_expect_success "PANIC: Test framework error. Unknown matches value $match_f_w_pathmatchi" 'false'
+	fi
+}
+
+# Basic wildmatch features
+wildtest 1 1 1 1 foo foo
+wildtest 0 0 0 0 foo bar
+wildtest 1 1 1 1 '' ""
+wildtest 1 1 1 1 foo '???'
+wildtest 0 0 0 0 foo '??'
+wildtest 1 1 1 1 foo '*'
+wildtest 1 1 1 1 foo 'f*'
+wildtest 0 0 0 0 foo '*f'
+wildtest 1 1 1 1 foo '*foo*'
+wildtest 1 1 1 1 foobar '*ob*a*r*'
+wildtest 1 1 1 1 aaaaaaabababab '*ab'
+wildtest 1 1 1 1 'foo*' 'foo\*'
+wildtest 0 0 0 0 foobar 'foo\*bar'
+wildtest 1 1 1 1 'f\oo' 'f\\oo'
+wildtest 1 1 1 1 ball '*[al]?'
+wildtest 0 0 0 0 ten '[ten]'
+wildtest 0 0 1 1 ten '**[!te]'
+wildtest 0 0 0 0 ten '**[!ten]'
+wildtest 1 1 1 1 ten 't[a-g]n'
+wildtest 0 0 0 0 ten 't[!a-g]n'
+wildtest 1 1 1 1 ton 't[!a-g]n'
+wildtest 1 1 1 1 ton 't[^a-g]n'
+wildtest 1 1 1 1 'a]b' 'a[]]b'
+wildtest 1 1 1 1 a-b 'a[]-]b'
+wildtest 1 1 1 1 'a]b' 'a[]-]b'
+wildtest 0 0 0 0 aab 'a[]-]b'
+wildtest 1 1 1 1 aab 'a[]a-]b'
+wildtest 1 1 1 1 ']' ']'
 
 # Extended slash-matching features
-match 0 0 'foo/baz/bar' 'foo*bar'
-match 0 0 'foo/baz/bar' 'foo**bar'
-match 0 1 'foobazbar' 'foo**bar'
-match 1 1 'foo/baz/bar' 'foo/**/bar'
-match 1 0 'foo/baz/bar' 'foo/**/**/bar'
-match 1 0 'foo/b/a/z/bar' 'foo/**/bar'
-match 1 0 'foo/b/a/z/bar' 'foo/**/**/bar'
-match 1 0 'foo/bar' 'foo/**/bar'
-match 1 0 'foo/bar' 'foo/**/**/bar'
-match 0 0 'foo/bar' 'foo?bar'
-match 0 0 'foo/bar' 'foo[/]bar'
-match 0 0 'foo/bar' 'foo[^a-z]bar'
-match 0 0 'foo/bar' 'f[^eiu][^eiu][^eiu][^eiu][^eiu]r'
-match 1 1 'foo-bar' 'f[^eiu][^eiu][^eiu][^eiu][^eiu]r'
-match 1 0 'foo' '**/foo'
-match 1 x 'XXX/foo' '**/foo'
-match 1 0 'bar/baz/foo' '**/foo'
-match 0 0 'bar/baz/foo' '*/foo'
-match 0 0 'foo/bar/baz' '**/bar*'
-match 1 0 'deep/foo/bar/baz' '**/bar/*'
-match 0 0 'deep/foo/bar/baz/' '**/bar/*'
-match 1 0 'deep/foo/bar/baz/' '**/bar/**'
-match 0 0 'deep/foo/bar' '**/bar/*'
-match 1 0 'deep/foo/bar/' '**/bar/**'
-match 0 0 'foo/bar/baz' '**/bar**'
-match 1 0 'foo/bar/baz/x' '*/bar/**'
-match 0 0 'deep/foo/bar/baz/x' '*/bar/**'
-match 1 0 'deep/foo/bar/baz/x' '**/bar/*/*'
+wildtest 0 0 1 1 'foo/baz/bar' 'foo*bar'
+wildtest 0 0 1 1 'foo/baz/bar' 'foo**bar'
+wildtest 0 0 1 1 'foobazbar' 'foo**bar'
+wildtest 1 1 1 1 'foo/baz/bar' 'foo/**/bar'
+wildtest 1 1 0 0 'foo/baz/bar' 'foo/**/**/bar'
+wildtest 1 1 1 1 'foo/b/a/z/bar' 'foo/**/bar'
+wildtest 1 1 1 1 'foo/b/a/z/bar' 'foo/**/**/bar'
+wildtest 1 1 0 0 'foo/bar' 'foo/**/bar'
+wildtest 1 1 0 0 'foo/bar' 'foo/**/**/bar'
+wildtest 0 0 1 1 'foo/bar' 'foo?bar'
+wildtest 0 0 1 1 'foo/bar' 'foo[/]bar'
+wildtest 0 0 1 1 'foo/bar' 'foo[^a-z]bar'
+wildtest 0 0 1 1 'foo/bar' 'f[^eiu][^eiu][^eiu][^eiu][^eiu]r'
+wildtest 1 1 1 1 'foo-bar' 'f[^eiu][^eiu][^eiu][^eiu][^eiu]r'
+wildtest 1 1 0 0 'foo' '**/foo'
+wildtest 1 1 1 1 'XXX/foo' '**/foo'
+wildtest 1 1 1 1 'bar/baz/foo' '**/foo'
+wildtest 0 0 1 1 'bar/baz/foo' '*/foo'
+wildtest 0 0 1 1 'foo/bar/baz' '**/bar*'
+wildtest 1 1 1 1 'deep/foo/bar/baz' '**/bar/*'
+wildtest 0 0 1 1 'deep/foo/bar/baz/' '**/bar/*'
+wildtest 1 1 1 1 'deep/foo/bar/baz/' '**/bar/**'
+wildtest 0 0 0 0 'deep/foo/bar' '**/bar/*'
+wildtest 1 1 1 1 'deep/foo/bar/' '**/bar/**'
+wildtest 0 0 1 1 'foo/bar/baz' '**/bar**'
+wildtest 1 1 1 1 'foo/bar/baz/x' '*/bar/**'
+wildtest 0 0 1 1 'deep/foo/bar/baz/x' '*/bar/**'
+wildtest 1 1 1 1 'deep/foo/bar/baz/x' '**/bar/*/*'
 
 # Various additional tests
-match 0 0 'acrt' 'a[c-c]st'
-match 1 1 'acrt' 'a[c-c]rt'
-match 0 0 ']' '[!]-]'
-match 1 x 'a' '[!]-]'
-match 0 0 '' '\'
-match 0 x '\' '\'
-match 0 x 'XXX/\' '*/\'
-match 1 x 'XXX/\' '*/\\'
-match 1 1 'foo' 'foo'
-match 1 1 '@foo' '@foo'
-match 0 0 'foo' '@foo'
-match 1 1 '[ab]' '\[ab]'
-match 1 1 '[ab]' '[[]ab]'
-match 1 x '[ab]' '[[:]ab]'
-match 0 x '[ab]' '[[::]ab]'
-match 1 x '[ab]' '[[:digit]ab]'
-match 1 x '[ab]' '[\[:]ab]'
-match 1 1 '?a?b' '\??\?b'
-match 1 1 'abc' '\a\b\c'
-match 0 0 'foo' ''
-match 1 0 'foo/bar/baz/to' '**/t[o]'
+wildtest 0 0 0 0 'acrt' 'a[c-c]st'
+wildtest 1 1 1 1 'acrt' 'a[c-c]rt'
+wildtest 0 0 0 0 ']' '[!]-]'
+wildtest 1 1 1 1 'a' '[!]-]'
+wildtest 0 0 0 0 '' '\'
+wildtest 0 0 0 0 \
+	 1 1 1 1 '\' '\'
+wildtest 0 0 0 0 'XXX/\' '*/\'
+wildtest 1 1 1 1 'XXX/\' '*/\\'
+wildtest 1 1 1 1 'foo' 'foo'
+wildtest 1 1 1 1 '@foo' '@foo'
+wildtest 0 0 0 0 'foo' '@foo'
+wildtest 1 1 1 1 '[ab]' '\[ab]'
+wildtest 1 1 1 1 '[ab]' '[[]ab]'
+wildtest 1 1 1 1 '[ab]' '[[:]ab]'
+wildtest 0 0 0 0 '[ab]' '[[::]ab]'
+wildtest 1 1 1 1 '[ab]' '[[:digit]ab]'
+wildtest 1 1 1 1 '[ab]' '[\[:]ab]'
+wildtest 1 1 1 1 '?a?b' '\??\?b'
+wildtest 1 1 1 1 'abc' '\a\b\c'
+wildtest 0 0 0 0 \
+	 E E E E 'foo' ''
+wildtest 1 1 1 1 'foo/bar/baz/to' '**/t[o]'
 
 # Character class tests
-match 1 x 'a1B' '[[:alpha:]][[:digit:]][[:upper:]]'
-match 0 x 'a' '[[:digit:][:upper:][:space:]]'
-match 1 x 'A' '[[:digit:][:upper:][:space:]]'
-match 1 x '1' '[[:digit:][:upper:][:space:]]'
-match 0 x '1' '[[:digit:][:upper:][:spaci:]]'
-match 1 x ' ' '[[:digit:][:upper:][:space:]]'
-match 0 x '.' '[[:digit:][:upper:][:space:]]'
-match 1 x '.' '[[:digit:][:punct:][:space:]]'
-match 1 x '5' '[[:xdigit:]]'
-match 1 x 'f' '[[:xdigit:]]'
-match 1 x 'D' '[[:xdigit:]]'
-match 1 x '_' '[[:alnum:][:alpha:][:blank:][:cntrl:][:digit:][:graph:][:lower:][:print:][:punct:][:space:][:upper:][:xdigit:]]'
-match 1 x '.' '[^[:alnum:][:alpha:][:blank:][:cntrl:][:digit:][:lower:][:space:][:upper:][:xdigit:]]'
-match 1 x '5' '[a-c[:digit:]x-z]'
-match 1 x 'b' '[a-c[:digit:]x-z]'
-match 1 x 'y' '[a-c[:digit:]x-z]'
-match 0 x 'q' '[a-c[:digit:]x-z]'
+wildtest 1 1 1 1 'a1B' '[[:alpha:]][[:digit:]][[:upper:]]'
+wildtest 0 1 0 1 'a' '[[:digit:][:upper:][:space:]]'
+wildtest 1 1 1 1 'A' '[[:digit:][:upper:][:space:]]'
+wildtest 1 1 1 1 '1' '[[:digit:][:upper:][:space:]]'
+wildtest 0 0 0 0 '1' '[[:digit:][:upper:][:spaci:]]'
+wildtest 1 1 1 1 ' ' '[[:digit:][:upper:][:space:]]'
+wildtest 0 0 0 0 '.' '[[:digit:][:upper:][:space:]]'
+wildtest 1 1 1 1 '.' '[[:digit:][:punct:][:space:]]'
+wildtest 1 1 1 1 '5' '[[:xdigit:]]'
+wildtest 1 1 1 1 'f' '[[:xdigit:]]'
+wildtest 1 1 1 1 'D' '[[:xdigit:]]'
+wildtest 1 1 1 1 '_' '[[:alnum:][:alpha:][:blank:][:cntrl:][:digit:][:graph:][:lower:][:print:][:punct:][:space:][:upper:][:xdigit:]]'
+wildtest 1 1 1 1 '.' '[^[:alnum:][:alpha:][:blank:][:cntrl:][:digit:][:lower:][:space:][:upper:][:xdigit:]]'
+wildtest 1 1 1 1 '5' '[a-c[:digit:]x-z]'
+wildtest 1 1 1 1 'b' '[a-c[:digit:]x-z]'
+wildtest 1 1 1 1 'y' '[a-c[:digit:]x-z]'
+wildtest 0 0 0 0 'q' '[a-c[:digit:]x-z]'
 
-# Additional tests, including some malformed wildmats
-match 1 x ']' '[\\-^]'
-match 0 0 '[' '[\\-^]'
-match 1 x '-' '[\-_]'
-match 1 x ']' '[\]]'
-match 0 0 '\]' '[\]]'
-match 0 0 '\' '[\]]'
-match 0 0 'ab' 'a[]b'
-match 0 x 'a[]b' 'a[]b'
-match 0 x 'ab[' 'ab['
-match 0 0 'ab' '[!'
-match 0 0 'ab' '[-'
-match 1 1 '-' '[-]'
-match 0 0 '-' '[a-'
-match 0 0 '-' '[!a-'
-match 1 x '-' '[--A]'
-match 1 x '5' '[--A]'
-match 1 1 ' ' '[ --]'
-match 1 1 '$' '[ --]'
-match 1 1 '-' '[ --]'
-match 0 0 '0' '[ --]'
-match 1 x '-' '[---]'
-match 1 x '-' '[------]'
-match 0 0 'j' '[a-e-n]'
-match 1 x '-' '[a-e-n]'
-match 1 x 'a' '[!------]'
-match 0 0 '[' '[]-a]'
-match 1 x '^' '[]-a]'
-match 0 0 '^' '[!]-a]'
-match 1 x '[' '[!]-a]'
-match 1 1 '^' '[a^bc]'
-match 1 x '-b]' '[a-]b]'
-match 0 0 '\' '[\]'
-match 1 1 '\' '[\\]'
-match 0 0 '\' '[!\\]'
-match 1 1 'G' '[A-\\]'
-match 0 0 'aaabbb' 'b*a'
-match 0 0 'aabcaa' '*ba*'
-match 1 1 ',' '[,]'
-match 1 1 ',' '[\\,]'
-match 1 1 '\' '[\\,]'
-match 1 1 '-' '[,-.]'
-match 0 0 '+' '[,-.]'
-match 0 0 '-.]' '[,-.]'
-match 1 1 '2' '[\1-\3]'
-match 1 1 '3' '[\1-\3]'
-match 0 0 '4' '[\1-\3]'
-match 1 1 '\' '[[-\]]'
-match 1 1 '[' '[[-\]]'
-match 1 1 ']' '[[-\]]'
-match 0 0 '-' '[[-\]]'
+# Additional tests, including some malformed wildmatch patterns
+wildtest 1 1 1 1 ']' '[\\-^]'
+wildtest 0 0 0 0 '[' '[\\-^]'
+wildtest 1 1 1 1 '-' '[\-_]'
+wildtest 1 1 1 1 ']' '[\]]'
+wildtest 0 0 0 0 '\]' '[\]]'
+wildtest 0 0 0 0 '\' '[\]]'
+wildtest 0 0 0 0 'ab' 'a[]b'
+wildtest 0 0 0 0 \
+	 1 1 1 1 'a[]b' 'a[]b'
+wildtest 0 0 0 0 \
+	 1 1 1 1 'ab[' 'ab['
+wildtest 0 0 0 0 'ab' '[!'
+wildtest 0 0 0 0 'ab' '[-'
+wildtest 1 1 1 1 '-' '[-]'
+wildtest 0 0 0 0 '-' '[a-'
+wildtest 0 0 0 0 '-' '[!a-'
+wildtest 1 1 1 1 '-' '[--A]'
+wildtest 1 1 1 1 '5' '[--A]'
+wildtest 1 1 1 1 ' ' '[ --]'
+wildtest 1 1 1 1 '$' '[ --]'
+wildtest 1 1 1 1 '-' '[ --]'
+wildtest 0 0 0 0 '0' '[ --]'
+wildtest 1 1 1 1 '-' '[---]'
+wildtest 1 1 1 1 '-' '[------]'
+wildtest 0 0 0 0 'j' '[a-e-n]'
+wildtest 1 1 1 1 '-' '[a-e-n]'
+wildtest 1 1 1 1 'a' '[!------]'
+wildtest 0 0 0 0 '[' '[]-a]'
+wildtest 1 1 1 1 '^' '[]-a]'
+wildtest 0 0 0 0 '^' '[!]-a]'
+wildtest 1 1 1 1 '[' '[!]-a]'
+wildtest 1 1 1 1 '^' '[a^bc]'
+wildtest 1 1 1 1 '-b]' '[a-]b]'
+wildtest 0 0 0 0 '\' '[\]'
+wildtest 1 1 1 1 '\' '[\\]'
+wildtest 0 0 0 0 '\' '[!\\]'
+wildtest 1 1 1 1 'G' '[A-\\]'
+wildtest 0 0 0 0 'aaabbb' 'b*a'
+wildtest 0 0 0 0 'aabcaa' '*ba*'
+wildtest 1 1 1 1 ',' '[,]'
+wildtest 1 1 1 1 ',' '[\\,]'
+wildtest 1 1 1 1 '\' '[\\,]'
+wildtest 1 1 1 1 '-' '[,-.]'
+wildtest 0 0 0 0 '+' '[,-.]'
+wildtest 0 0 0 0 '-.]' '[,-.]'
+wildtest 1 1 1 1 '2' '[\1-\3]'
+wildtest 1 1 1 1 '3' '[\1-\3]'
+wildtest 0 0 0 0 '4' '[\1-\3]'
+wildtest 1 1 1 1 '\' '[[-\]]'
+wildtest 1 1 1 1 '[' '[[-\]]'
+wildtest 1 1 1 1 ']' '[[-\]]'
+wildtest 0 0 0 0 '-' '[[-\]]'
 
-# Test recursion and the abort code (use "wildtest -i" to see iteration counts)
-match 1 1 '-adobe-courier-bold-o-normal--12-120-75-75-m-70-iso8859-1' '-*-*-*-*-*-*-12-*-*-*-m-*-*-*'
-match 0 0 '-adobe-courier-bold-o-normal--12-120-75-75-X-70-iso8859-1' '-*-*-*-*-*-*-12-*-*-*-m-*-*-*'
-match 0 0 '-adobe-courier-bold-o-normal--12-120-75-75-/-70-iso8859-1' '-*-*-*-*-*-*-12-*-*-*-m-*-*-*'
-match 1 1 'XXX/adobe/courier/bold/o/normal//12/120/75/75/m/70/iso8859/1' 'XXX/*/*/*/*/*/*/12/*/*/*/m/*/*/*'
-match 0 0 'XXX/adobe/courier/bold/o/normal//12/120/75/75/X/70/iso8859/1' 'XXX/*/*/*/*/*/*/12/*/*/*/m/*/*/*'
-match 1 0 'abcd/abcdefg/abcdefghijk/abcdefghijklmnop.txt' '**/*a*b*g*n*t'
-match 0 0 'abcd/abcdefg/abcdefghijk/abcdefghijklmnop.txtz' '**/*a*b*g*n*t'
-match 0 x foo '*/*/*'
-match 0 x foo/bar '*/*/*'
-match 1 x foo/bba/arr '*/*/*'
-match 0 x foo/bb/aa/rr '*/*/*'
-match 1 x foo/bb/aa/rr '**/**/**'
-match 1 x abcXdefXghi '*X*i'
-match 0 x ab/cXd/efXg/hi '*X*i'
-match 1 x ab/cXd/efXg/hi '*/*X*/*/*i'
-match 1 x ab/cXd/efXg/hi '**/*X*/**/*i'
+# Test recursion
+wildtest 1 1 1 1 '-adobe-courier-bold-o-normal--12-120-75-75-m-70-iso8859-1' '-*-*-*-*-*-*-12-*-*-*-m-*-*-*'
+wildtest 0 0 0 0 '-adobe-courier-bold-o-normal--12-120-75-75-X-70-iso8859-1' '-*-*-*-*-*-*-12-*-*-*-m-*-*-*'
+wildtest 0 0 0 0 '-adobe-courier-bold-o-normal--12-120-75-75-/-70-iso8859-1' '-*-*-*-*-*-*-12-*-*-*-m-*-*-*'
+wildtest 1 1 1 1 'XXX/adobe/courier/bold/o/normal//12/120/75/75/m/70/iso8859/1' 'XXX/*/*/*/*/*/*/12/*/*/*/m/*/*/*'
+wildtest 0 0 0 0 'XXX/adobe/courier/bold/o/normal//12/120/75/75/X/70/iso8859/1' 'XXX/*/*/*/*/*/*/12/*/*/*/m/*/*/*'
+wildtest 1 1 1 1 'abcd/abcdefg/abcdefghijk/abcdefghijklmnop.txt' '**/*a*b*g*n*t'
+wildtest 0 0 0 0 'abcd/abcdefg/abcdefghijk/abcdefghijklmnop.txtz' '**/*a*b*g*n*t'
+wildtest 0 0 0 0 foo '*/*/*'
+wildtest 0 0 0 0 foo/bar '*/*/*'
+wildtest 1 1 1 1 foo/bba/arr '*/*/*'
+wildtest 0 0 1 1 foo/bb/aa/rr '*/*/*'
+wildtest 1 1 1 1 foo/bb/aa/rr '**/**/**'
+wildtest 1 1 1 1 abcXdefXghi '*X*i'
+wildtest 0 0 1 1 ab/cXd/efXg/hi '*X*i'
+wildtest 1 1 1 1 ab/cXd/efXg/hi '*/*X*/*/*i'
+wildtest 1 1 1 1 ab/cXd/efXg/hi '**/*X*/**/*i'
 
-pathmatch 1 foo foo
-pathmatch 0 foo fo
-pathmatch 1 foo/bar foo/bar
-pathmatch 1 foo/bar 'foo/*'
-pathmatch 1 foo/bba/arr 'foo/*'
-pathmatch 1 foo/bba/arr 'foo/**'
-pathmatch 1 foo/bba/arr 'foo*'
-pathmatch 1 foo/bba/arr 'foo**'
-pathmatch 1 foo/bba/arr 'foo/*arr'
-pathmatch 1 foo/bba/arr 'foo/**arr'
-pathmatch 0 foo/bba/arr 'foo/*z'
-pathmatch 0 foo/bba/arr 'foo/**z'
-pathmatch 1 foo/bar 'foo?bar'
-pathmatch 1 foo/bar 'foo[/]bar'
-pathmatch 1 foo/bar 'foo[^a-z]bar'
-pathmatch 0 foo '*/*/*'
-pathmatch 0 foo/bar '*/*/*'
-pathmatch 1 foo/bba/arr '*/*/*'
-pathmatch 1 foo/bb/aa/rr '*/*/*'
-pathmatch 1 abcXdefXghi '*X*i'
-pathmatch 1 ab/cXd/efXg/hi '*/*X*/*/*i'
-pathmatch 1 ab/cXd/efXg/hi '*Xg*i'
+# Extra pathmatch tests
+wildtest 0 0 0 0 foo fo
+wildtest 1 1 1 1 foo/bar foo/bar
+wildtest 1 1 1 1 foo/bar 'foo/*'
+wildtest 0 0 1 1 foo/bba/arr 'foo/*'
+wildtest 1 1 1 1 foo/bba/arr 'foo/**'
+wildtest 0 0 1 1 foo/bba/arr 'foo*'
+wildtest 0 0 1 1 \
+	 1 1 1 1 foo/bba/arr 'foo**'
+wildtest 0 0 1 1 foo/bba/arr 'foo/*arr'
+wildtest 0 0 1 1 foo/bba/arr 'foo/**arr'
+wildtest 0 0 0 0 foo/bba/arr 'foo/*z'
+wildtest 0 0 0 0 foo/bba/arr 'foo/**z'
+wildtest 0 0 1 1 foo/bar 'foo?bar'
+wildtest 0 0 1 1 foo/bar 'foo[/]bar'
+wildtest 0 0 1 1 foo/bar 'foo[^a-z]bar'
+wildtest 0 0 1 1 ab/cXd/efXg/hi '*Xg*i'
 
-# Case-sensitivity features
-match 0 x 'a' '[A-Z]'
-match 1 x 'A' '[A-Z]'
-match 0 x 'A' '[a-z]'
-match 1 x 'a' '[a-z]'
-match 0 x 'a' '[[:upper:]]'
-match 1 x 'A' '[[:upper:]]'
-match 0 x 'A' '[[:lower:]]'
-match 1 x 'a' '[[:lower:]]'
-match 0 x 'A' '[B-Za]'
-match 1 x 'a' '[B-Za]'
-match 0 x 'A' '[B-a]'
-match 1 x 'a' '[B-a]'
-match 0 x 'z' '[Z-y]'
-match 1 x 'Z' '[Z-y]'
-
-imatch 1 'a' '[A-Z]'
-imatch 1 'A' '[A-Z]'
-imatch 1 'A' '[a-z]'
-imatch 1 'a' '[a-z]'
-imatch 1 'a' '[[:upper:]]'
-imatch 1 'A' '[[:upper:]]'
-imatch 1 'A' '[[:lower:]]'
-imatch 1 'a' '[[:lower:]]'
-imatch 1 'A' '[B-Za]'
-imatch 1 'a' '[B-Za]'
-imatch 1 'A' '[B-a]'
-imatch 1 'a' '[B-a]'
-imatch 1 'z' '[Z-y]'
-imatch 1 'Z' '[Z-y]'
+# Extra case-sensitivity tests
+wildtest 0 1 0 1 'a' '[A-Z]'
+wildtest 1 1 1 1 'A' '[A-Z]'
+wildtest 0 1 0 1 'A' '[a-z]'
+wildtest 1 1 1 1 'a' '[a-z]'
+wildtest 0 1 0 1 'a' '[[:upper:]]'
+wildtest 1 1 1 1 'A' '[[:upper:]]'
+wildtest 0 1 0 1 'A' '[[:lower:]]'
+wildtest 1 1 1 1 'a' '[[:lower:]]'
+wildtest 0 1 0 1 'A' '[B-Za]'
+wildtest 1 1 1 1 'a' '[B-Za]'
+wildtest 0 1 0 1 'A' '[B-a]'
+wildtest 1 1 1 1 'a' '[B-a]'
+wildtest 0 1 0 1 'z' '[Z-y]'
+wildtest 1 1 1 1 'Z' '[Z-y]'
 
 test_done
