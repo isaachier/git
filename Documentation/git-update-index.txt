@@ -464,6 +464,17 @@ command reads the index; while when `--[no-|force-]untracked-cache`
 are used, the untracked cache is immediately added to or removed from
 the index.
 
+Before 2.16, the untracked cache had a bug where replacing a directory
+with a symlink to another directory could cause it to incorrectly show
+files tracked by git as untracked. See the "status: add a failing test
+showing a core.untrackedCache bug" commit to git.git. A workaround for
+that was (and this might work for other undiscoverd bugs in the
+future):
+
+----------------
+$ git -c core.untrackedCache=false status
+----------------
+
 File System Monitor
 -------------------
 
