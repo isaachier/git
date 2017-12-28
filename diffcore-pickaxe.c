@@ -124,11 +124,19 @@ static int pickaxe_match(struct diff_filepair *p, struct diff_options *o,
 	mmfile_t mf1, mf2;
 	int ret;
 
-	if (!o->pickaxe[0])
-		return 0;
-
 	/* ignore unmerged */
 	if (!DIFF_FILE_VALID(p->one) && !DIFF_FILE_VALID(p->two))
+		return 0;
+
+	if (o->objfind) {
+		if ((DIFF_FILE_VALID(p->one) &&
+		     oidset_contains(o->objfind, &p->one->oid)) ||
+		    (DIFF_FILE_VALID(p->two) &&
+		     oidset_contains(o->objfind, &p->two->oid)))
+			return 1;
+	}
+
+	if (!o->pickaxe[0])
 		return 0;
 
 	if (o->flags.allow_textconv) {
