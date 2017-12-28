@@ -32,7 +32,7 @@ create_test_file() {
 
 	# Turn foo/bar/baz into foo/bar to create foo/bar as a
 	# directory structure.
-	dirs=$(echo "$file" | sed -r 's!/[^/]+$!!')
+	dirs=${file%/*}
 
 	# We touch "./$file" instead of "$file" because even an
 	# escaped "touch -- -" means get arguments from stdin.
