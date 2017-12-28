@@ -1,4 +1,5 @@
 #include "cache.h"
+#include "fsmonitor.h"
 
 int cmd_main(int ac, const char **av)
 {
@@ -8,6 +9,7 @@ int cmd_main(int ac, const char **av)
 	setup_git_directory();
 	if (do_read_index(istate, get_index_file(), 0) < 0)
 		die("unable to read index file");
+	inflate_fsmonitor_ewah(istate);
 	if (!istate->fsmonitor_last_update) {
 		printf("no fsmonitor\n");
 		return 0;
@@ -17,5 +19,6 @@ int cmd_main(int ac, const char **av)
 	for (i = 0; i < istate->cache_nr; i++)
 		printf((istate->cache[i]->ce_flags & CE_FSMONITOR_VALID) ? "+" : "-");
 
+	printf("\n");
 	return 0;
 }

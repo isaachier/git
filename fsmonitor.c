@@ -227,7 +227,7 @@ void remove_fsmonitor(struct index_state *istate)
 	}
 }
 
-void tweak_fsmonitor(struct index_state *istate)
+void inflate_fsmonitor_ewah(struct index_state *istate)
 {
 	int i;
 	int fsmonitor_enabled = git_config_get_fsmonitor();
@@ -250,6 +250,13 @@ void tweak_fsmonitor(struct index_state *istate)
 		ewah_free(istate->fsmonitor_dirty);
 		istate->fsmonitor_dirty = NULL;
 	}
+}
+
+void tweak_fsmonitor(struct index_state *istate)
+{
+	int fsmonitor_enabled = git_config_get_fsmonitor();
+
+	inflate_fsmonitor_ewah(istate);
 
 	switch (fsmonitor_enabled) {
 	case -1: /* keep: do nothing */
