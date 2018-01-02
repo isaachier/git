@@ -1,6 +1,39 @@
 cmake_minimum_required(VERSION 3.3)
-project(git VERSION 2.16)
 
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/version" AND
+   NOT IS_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/version")
+  file(READ "${CMAKE_CURRENT_SOURCE_DIR}/version" GIT_VERSION)
+elseif(IS_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/.git")
+  find_package(Git)
+  if(GIT_FOUND)
+    execute_process(COMMAND ${GIT_EXECUTABLE} describe --match "v[0-9]*" HEAD
+                    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+                    OUTPUT_VARIABLE GIT_VERSION
+                    OUTPUT_STRIP_TRAILING_WHITESPACE)
+    if(GIT_VERSION MATCHES "v[0-9]*")
+      string(REPLACE "-" "." GIT_VERSION "${GIT_VERSION}")
+      execute_process(COMMAND ${GIT_EXECUTABLE} diff-index --name-only HEAD --
+                      WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+                      OUTPUT_VARIABLE git_diff_index_output
+                      OUTPUT_STRIP_TRAILING_WHITESPACE)
+      if(git_diff_index_output)
+        set(GIT_VERSION "${GIT_VERSION}.dirty")
+      endif()
+      message(STATUS "GIT_VERSION: ${GIT_VERSION}")
+    else()
+      message(FATAL_ERROR "Cannot determine project version")
+    endif()
+  endif()
+else()
+  set(GIT_VERSION "${DEFAULT_VERSION}")
+endif()
+
+string(REGEX REPLACE "^v([0-9]+\\.[0-9]+\\.[0-9]+).*$" "\\1"
+       simplified_version "${GIT_VERSION}")
+project(git VERSION "${simplified_version}")
+message(STATUS "PROJECT_VERSION: ${PROJECT_VERSION}")
+
+include(CheckCCompilerFlag)
 include(CheckIncludeFile)
 include(CheckFunctionExists)
 include(CheckLibraryExists)
@@ -86,7 +119,7 @@ if(NOT CMAKE_CROSSCOMPILING)
 endif()
 print_bool(FREAD_READS_DIRECTORIES)
 
-include(FindOpenSSL)
+find_package(OpenSSL)
 cmake_dependent_option(OPENSSL "Use OpenSSL" ON "OPENSSL_FOUND" OFF)
 
 set(PCRE_VERSION "" CACHE STRING "pcre version (1 or 2), leave blank to omit")
@@ -119,21 +152,21 @@ endif()
 check_include_file("alloca.h" HAVE_ALLOCA_H)
 print_bool(HAVE_ALLOCA_H)
 
-include(FindCURL)
+find_package(CURL)
 cmake_dependent_option(CURL "Use libcurl, needed for HTTP transport" ON
                       "CURL_FOUND" OFF)
 
 find_program(CURL_CONFIG "curl-config")
 
-include(FindEXPAT)
+find_package(EXPAT)
 cmake_dependent_option(EXPAT "Enable expat for HTTP parsing" ON
                       "EXPAT_FOUND" OFF)
 
 # EXPAT_NEEDS_XMLPARSE_H not handled in CMake build, seeing as CMake FindEXPAT
 # explicitly relies on the existence of "expat.h" to find includes directory.
 
-include(FindGettext)
-include(FindIntl)
+find_package(Gettext)
+find_package(Intl)
 cmake_dependent_option(GETTEXT "Translate git output" ON
                        "GETTEXT_FOUND;Intl_FOUND" OFF)
 if(GETTEXT)
@@ -363,7 +396,7 @@ check_type_size("struct sockaddr" SOCKADDR_STORAGE)
 print_bool(SOCKADDR_STORAGE)
 set(CMAKE_EXTRA_INCLUDE_FILES)
 
-include(FindZLIB)
+find_package(ZLIB)
 if(ZLIB_FOUND)
   set(CMAKE_REQUIRED_LIBRARIES "${ZLIB_LIBRARIES}")
   check_function_exists(deflateBound DEFLATE_BOUND)
@@ -426,13 +459,14 @@ cmake_dependent_option(PYTHON "Enable Python scripts and libraries" ON
                        "PYTHON_PATH" OFF)
 print_bool(PYTHON)
 
-find_program(TCLTK_PATH wish)
+find_package(TCL)
+set(TCLTK_PATH "${TK_WISH}")
 message(STATUS "TCLTK_PATH: ${TCLTK_PATH}")
 
 cmake_dependent_option(TCLTK "Enable Tcl/Tk GUI" ON "TCLTK_PATH" OFF)
 print_bool(TCLTK)
 if(TCLTK)
-  find_program(TCL_PATH tclsh)
+  set(TCL_PATH "${TCL_TCLSH}")
   message(STATUS "TCL_PATH: ${TCL_PATH}")
 endif()
 
@@ -583,3 +617,24 @@ set(doc_string "SP separated VAR=VAL pairs to define default environment")
 set(doc_string "${doc_string} variables to be passed when a pager is spawned")
 set(PAGER_ENV "" CACHE STRING "${doc_string}")
 message(STATUS "PAGER_ENV: ${PAGER_ENV}")
+
+option(DEVELOPER "Enable developer warnings" OFF)
+if(DEVELOPER)
+  set(dev_c_flags
+      "-Werror"
+      "-Wdeclaration-after-statement"
+      "-Wno-format-zero-length"
+      "-Wold-style-definition"
+      "-Woverflow"
+      "-Wpointer-arith"
+      "-Wstrict-prototypes"
+      "-Wunused"
+      "-Wvla")
+  foreach(flag ${dev_c_flags})
+    string(MAKE_C_IDENTIFIER "${flag}" flag_var)
+    check_c_compiler_flag("${flag}" have_${flag_var})
+    if(have_${flag_var})
+      set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${flag}")
+    endif()
+  endforeach()
+endif()
