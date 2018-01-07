@@ -7,12 +7,13 @@
 
 int main(int argc, const char **argv)
 {
+	struct stat sb;
+
 	int fd = open(argv[1], O_RDONLY);
 	if (fd == -1) {
 		return EXIT_FAILURE;
 	}
 
-	struct stat sb;
 	if (fstat(fd, &sb) == -1) {
 		close(fd);
 		return EXIT_FAILURE;
