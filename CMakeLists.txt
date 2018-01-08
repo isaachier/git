@@ -853,15 +853,14 @@ foreach(script_path ${script_lib})
 endforeach()
 install(FILES ${script_lib_gen} DESTINATION "${git_exec_dir}")
 
+list(APPEND script_perl "${CMAKE_CURRENT_SOURCE_DIR}/git-add--interactive.perl")
+list(APPEND script_perl "${CMAKE_CURRENT_SOURCE_DIR}/git-archimport.perl")
+list(APPEND script_perl "${CMAKE_CURRENT_SOURCE_DIR}/git-cvsexportcommit.perl")
+list(APPEND script_perl "${CMAKE_CURRENT_SOURCE_DIR}/git-cvsimport.perl")
+list(APPEND script_perl "${CMAKE_CURRENT_SOURCE_DIR}/git-cvsserver.perl")
+list(APPEND script_perl "${CMAKE_CURRENT_SOURCE_DIR}/git-send-email.perl")
+list(APPEND script_perl "${CMAKE_CURRENT_SOURCE_DIR}/git-svn.perl")
 if(PERL)
-  list(APPEND script_perl "${CMAKE_CURRENT_SOURCE_DIR}/git-add--interactive.perl")
-  list(APPEND script_perl "${CMAKE_CURRENT_SOURCE_DIR}/git-archimport.perl")
-  list(APPEND script_perl "${CMAKE_CURRENT_SOURCE_DIR}/git-cvsexportcommit.perl")
-  list(APPEND script_perl "${CMAKE_CURRENT_SOURCE_DIR}/git-cvsimport.perl")
-  list(APPEND script_perl "${CMAKE_CURRENT_SOURCE_DIR}/git-cvsserver.perl")
-  list(APPEND script_perl "${CMAKE_CURRENT_SOURCE_DIR}/git-send-email.perl")
-  list(APPEND script_perl "${CMAKE_CURRENT_SOURCE_DIR}/git-svn.perl")
-
   foreach(script_path ${script_perl})
     fix_shebang("${script_path}" "${PERL_PATH}" script_content)
     string(FIND "${script_content}" "\n" first_line_ending)
@@ -884,8 +883,38 @@ if(PERL)
     install(PROGRAMS "${CMAKE_CURRENT_BINARY_DIR}/${output_name}"
             DESTINATION "${git_exec_dir}")
   endforeach()
+else()
+  foreach(script_path ${script_perl})
+    fix_shebang("${CMAKE_CURRENT_SOURCE_DIR}/unimplemented.sh"
+                "${SHELL_PATH}" script_content)
+    string(REPLACE "@@REASON@@" "PERL=OFF" script_content "${script_content}")
+    get_filename_component(output_name "${script_path}" NAME_WE)
+    file(GENERATE OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/${output_name}"
+         CONTENT "${script_content}")
+    install(PROGRAMS "${CMAKE_CURRENT_BINARY_DIR}/${output_name}"
+            DESTINATION "${git_exec_dir}")
+  endforeach()
 endif()
 
+list(APPEND script_python "${CMAKE_CURRENT_SOURCE_DIR}/git-p4.py")
 if(PYTHON)
-  list(APPEND script_python "${CMAKE_CURRENT_SOURCE_DIR}/git-p4.py")
+  foreach(script_path ${script_python})
+    fix_shebang("${script_path}" "${PYTHON_PATH}" script_content)
+    get_filename_component(output_name "${script_path}" NAME_WE)
+    file(GENERATE OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/${output_name}"
+         CONTENT "${script_content}")
+    install(PROGRAMS "${CMAKE_CURRENT_BINARY_DIR}/${output_name}"
+            DESTINATION "${git_exec_dir}")
+  endforeach()
+else()
+  foreach(script_path ${script_python})
+    fix_shebang("${CMAKE_CURRENT_SOURCE_DIR}/unimplemented.sh"
+                "${SHELL_PATH}" script_content)
+    string(REPLACE "@@REASON@@" "PYTHON=OFF" script_content "${script_content}")
+    get_filename_component(output_name "${script_path}" NAME_WE)
+    file(GENERATE OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/${output_name}"
+         CONTENT "${script_content}")
+    install(PROGRAMS "${CMAKE_CURRENT_BINARY_DIR}/${output_name}"
+            DESTINATION "${git_exec_dir}")
+  endforeach()
 endif()
