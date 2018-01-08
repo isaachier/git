@@ -59,6 +59,7 @@ include(CheckStructHasMember)
 include(CheckSymbolExists)
 include(CheckTypeSize)
 include(CMakeDependentOption)
+include(CTest)
 
 macro(print_bool arg_name)
   if(${arg_name})
@@ -75,6 +76,348 @@ macro(add_c_flag c_flags flag)
     set(${c_flags} "${${c_flags}} ${flag}")
   endif()
 endmacro()
+
+set(program_src
+    "${CMAKE_CURRENT_SOURCE_DIR}/credential-store.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/daemon.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/fast-import.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/http-backend.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/imap-send.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/sh-i18n--envsubst.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/shell.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/show-index.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/upload-pack.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/remote-testsvn.c")
+
+if(ENABLE_TESTING)
+  set(test_program_src
+    "${CMAKE_CURRENT_SOURCE_DIR}/t/helper/test-chmtime.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/t/helper/test-ctype.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/t/helper/test-config.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/t/helper/test-date.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/t/helper/test-delta.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/t/helper/test-drop-caches.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/t/helper/test-dump-cache-tree.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/t/helper/test-dump-fsmonitor.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/t/helper/test-dump-split-index.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/t/helper/test-dump-untracked-cache.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/t/helper/test-example-decorate.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/t/helper/test-fake-ssh.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/t/helper/test-genrandom.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/t/helper/test-hashmap.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/t/helper/test-index-version.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/t/helper/test-lazy-init-name-hash.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/t/helper/test-line-buffer.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/t/helper/test-match-trees.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/t/helper/test-mergesort.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/t/helper/test-mktemp.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/t/helper/test-online-cpus.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/t/helper/test-parse-options.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/t/helper/test-path-utils.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/t/helper/test-prio-queue.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/t/helper/test-read-cache.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/t/helper/test-write-cache.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/t/helper/test-ref-store.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/t/helper/test-regex.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/t/helper/test-revision-walking.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/t/helper/test-run-command.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/t/helper/test-scrap-cache-tree.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/t/helper/test-sha1.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/t/helper/test-sha1-array.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/t/helper/test-sigchain.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/t/helper/test-strcmp-offset.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/t/helper/test-string-list.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/t/helper/test-submodule-config.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/t/helper/test-subprocess.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/t/helper/test-svn-fe.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/t/helper/test-urlmatch-normalization.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/t/helper/test-wildmatch.c")
+endif()
+
+set(lib_src
+    "${CMAKE_CURRENT_SOURCE_DIR}/abspath.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/advice.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/alias.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/alloc.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/apply.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/archive.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/archive-tar.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/archive-zip.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/argv-array.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/attr.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/base85.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/bisect.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/blame.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/blob.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/branch.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/bulk-checkin.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/bundle.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/cache-tree.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/checkout.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/color.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/column.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/combine-diff.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/commit.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/compat/obstack.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/compat/terminal.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/config.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/connect.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/connected.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/convert.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/copy.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/credential.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/csum-file.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/ctype.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/date.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/decorate.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/diffcore-break.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/diffcore-delta.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/diffcore-order.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/diffcore-pickaxe.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/diffcore-rename.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/diff-delta.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/diff-lib.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/diff-no-index.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/diff.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/dir.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/dir-iterator.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/editor.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/entry.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/environment.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/ewah/bitmap.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/ewah/ewah_bitmap.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/ewah/ewah_io.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/ewah/ewah_rlw.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/exec_cmd.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/fetch-pack.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/fsck.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/fsmonitor.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/gettext.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/gpg-interface.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/graph.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/grep.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/hashmap.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/help.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/hex.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/ident.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/kwset.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/levenshtein.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/line-log.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/line-range.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/list-objects.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/list-objects-filter.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/list-objects-filter-options.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/ll-merge.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/lockfile.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/log-tree.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/mailinfo.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/mailmap.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/match-trees.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/merge.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/merge-blobs.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/merge-recursive.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/mergesort.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/mru.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/name-hash.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/notes.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/notes-cache.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/notes-merge.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/notes-utils.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/object.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/oidmap.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/oidset.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/packfile.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/pack-bitmap.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/pack-bitmap-write.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/pack-check.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/pack-objects.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/pack-revindex.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/pack-write.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/pager.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/parse-options.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/parse-options-cb.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/patch-delta.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/patch-ids.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/path.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/pathspec.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/pkt-line.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/preload-index.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/pretty.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/prio-queue.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/progress.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/prompt.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/protocol.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/quote.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/reachable.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/read-cache.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/reflog-walk.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/refs.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/refs/files-backend.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/refs/iterator.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/refs/packed-backend.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/refs/ref-cache.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/ref-filter.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/remote.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/replace_object.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/repository.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/rerere.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/resolve-undo.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/revision.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/run-command.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/send-pack.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/sequencer.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/server-info.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/setup.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/sha1-array.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/sha1-lookup.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/sha1_file.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/sha1_name.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/shallow.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/sideband.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/sigchain.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/split-index.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/strbuf.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/streaming.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/string-list.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/submodule.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/submodule-config.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/sub-process.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/symlinks.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tag.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tempfile.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tmp-objdir.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/trace.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/trailer.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/transport.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/transport-helper.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tree-diff.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tree.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tree-walk.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/unpack-trees.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/url.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/urlmatch.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/usage.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/userdiff.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/utf8.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/varint.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/version.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/versioncmp.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/walker.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/wildmatch.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/worktree.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/wrapper.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/write_or_die.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/ws.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/wt-status.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/xdiff-interface.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/zlib")
+
+set(builtin_src
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/add.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/am.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/annotate.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/apply.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/archive.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/bisect--helper.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/blame.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/branch.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/bundle.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/cat-file.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/check-attr.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/check-ignore.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/check-mailmap.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/check-ref-format.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/checkout-index.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/checkout.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/clean.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/clone.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/column.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/commit-tree.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/commit.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/config.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/count-objects.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/credential.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/describe.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/diff-files.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/diff-index.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/diff-tree.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/diff.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/difftool.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/fast-export.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/fetch-pack.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/fetch.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/fmt-merge-msg.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/for-each-ref.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/fsck.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/gc.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/get-tar-commit-id.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/grep.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/hash-object.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/help.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/index-pack.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/init-db.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/interpret-trailers.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/log.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/ls-files.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/ls-remote.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/ls-tree.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/mailinfo.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/mailsplit.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/merge.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/merge-base.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/merge-file.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/merge-index.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/merge-ours.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/merge-recursive.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/merge-tree.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/mktag.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/mktree.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/mv.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/name-rev.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/notes.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/pack-objects.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/pack-redundant.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/pack-refs.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/patch-id.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/prune-packed.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/prune.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/pull.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/push.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/read-tree.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/rebase--helper.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/receive-pack.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/reflog.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/remote.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/remote-ext.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/remote-fd.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/repack.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/replace.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/rerere.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/reset.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/rev-list.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/rev-parse.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/revert.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/rm.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/send-pack.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/shortlog.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/show-branch.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/show-ref.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/stripspace.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/submodule--helper.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/symbolic-ref.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/tag.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/unpack-file.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/unpack-objects.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/update-index.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/update-ref.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/update-server-info.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/upload-archive.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/var.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/verify-commit.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/verify-pack.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/verify-tag.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/worktree.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/builtin/write-tree.c")
 
 add_c_flag(CMAKE_C_FLAGS "-Wall")
 
@@ -104,16 +447,16 @@ if(SANITIZE)
   add_c_flag(CMAKE_C_FLAGS "-fno-omit-frame-pointer")
   string(REPLACE "," ";" SANITIZERS "${SANITIZE}")
   if("undefined" IN_LIST SANITIZERS)
-    list(APPEND defs "-DNO_UNALIGNED_LOADS")
+    list(APPEND basic_defs "-DNO_UNALIGNED_LOADS")
   endif()
   if("leak" IN_LIST SANITIZERS)
-    list(APPEND defs "-DSUPPRESS_ANNOTATED_LEAKS")
+    list(APPEND basic_defs "-DSUPPRESS_ANNOTATED_LEAKS")
   endif()
 endif()
 
 message(STATUS "CMAKE_C_FLAGS: ${CMAKE_C_FLAGS}")
 
-list(APPEND defs "-DGIT_HOST_CPU=${CMAKE_SYSTEM_PROCESSOR}")
+list(APPEND basic_defs "-DGIT_HOST_CPU=${CMAKE_SYSTEM_PROCESSOR}")
 message(STATUS "GIT_HOST_CPU: ${CMAKE_SYSTEM_PROCESSOR}")
 
 if(WIN32)
@@ -132,7 +475,7 @@ endif()
 set(CMAKE_EXTRA_INCLUDE_FILES)
 message(STATUS "socklen_t type: ${SOCKLEN_T}")
 if(SOCKLEN_T)
-  list(APPEND defs "-Dsocklen_t=${SOCKLEN_T}")
+  list(APPEND basic_defs "-Dsocklen_t=${SOCKLEN_T}")
 endif()
 
 set(INLINE "")
@@ -148,7 +491,7 @@ foreach(inline_keyword "inline" "__inline" "__inline__")
 endforeach()
 message(STATUS "INLINE: ${INLINE}")
 if(INLINE)
-  list(APPEND defs "-DINLINE=${INLINE}")
+  list(APPEND basic_defs "-DINLINE=${INLINE}")
 endif()
 
 if(NOT CMAKE_CROSSCOMPILING)
@@ -175,6 +518,9 @@ if(NOT CMAKE_CROSSCOMPILING)
   endif()
 endif()
 print_bool(SNPRINTF_RETURNS_BOGUS)
+if(SNPRINTF_RETURNS_BOGUS)
+  list(APPEND compat_defs "-DSNPRINTF_RETURNS_BOGUS")
+endif()
 
 if(NOT CMAKE_CROSSCOMPILING)
   try_run(fopen_dir_run_result
@@ -193,6 +539,9 @@ if(NOT CMAKE_CROSSCOMPILING)
   endif()
 endif()
 print_bool(FREAD_READS_DIRECTORIES)
+if(FREAD_READS_DIRECTORIES)
+  list(APPEND compat_defs "-DFREAD_READS_DIRECTORIES")
+endif()
 
 find_package(OpenSSL)
 cmake_dependent_option(OPENSSL "Use OpenSSL" ON "OPENSSL_FOUND" OFF)
@@ -221,9 +570,9 @@ if(PCRE_VERSION)
   endif()
 
   if(PCRE_INCLUDE_DIR AND PCRE_LIBRARY)
-    list(APPEND defs "-DUSE_LIBPCRE${PCRE_VERSION}")
-    list(APPEND include_dirs ${PCRE_INCLUDE_DIR})
-    list(APPEND libs ${PCRE_LIBRARY})
+    list(APPEND basic_defs "-DUSE_LIBPCRE${PCRE_VERSION}")
+    list(APPEND basic_include_dirs ${PCRE_INCLUDE_DIR})
+    list(APPEND basic_libs ${PCRE_LIBRARY})
 
     if(PCRE_VERSION STREQUAL "1" AND PCRE_LIBRARY)
       check_symbol_exists(PCRE_JIT_CONFIG "pcre.h" has_jit)
@@ -233,7 +582,7 @@ if(PCRE_VERSION)
       endif()
       print_bool(LIBPCRE1_JIT)
       if(NOT LIBPCRE1_JIT)
-        list(APPEND defs "-DNO_LIBPCRE1_JIT")
+        list(APPEND basic_defs "-DNO_LIBPCRE1_JIT")
       endif()
     endif()
   endif()
@@ -242,7 +591,7 @@ endif()
 check_include_file("alloca.h" HAVE_ALLOCA_H)
 print_bool(HAVE_ALLOCA_H)
 if(HAVE_ALLOCA_H)
-  list(APPEND defs "-DHAVE_ALLOCA_H")
+  list(APPEND basic_defs "-DHAVE_ALLOCA_H")
 endif()
 
 find_package(CURL)
@@ -250,9 +599,10 @@ cmake_dependent_option(CURL "Use libcurl, needed for HTTP transport" ON
                        "CURL_FOUND" OFF)
 if(CURL)
   set(NO_CURL "0")
+  list(APPEND program_src "${CMAKE_CURRENT_SOURCE_DIR}/http-fetch.c")
 else()
   set(NO_CURL "1")
-  list(APPEND defs "-DNO_CURL")
+  list(APPEND basic_defs "-DNO_CURL")
 endif()
 
 find_package(EXPAT)
@@ -260,6 +610,20 @@ cmake_dependent_option(EXPAT "Enable expat for HTTP parsing" ON
                       "EXPAT_FOUND" OFF)
 # EXPAT_NEEDS_XMLPARSE_H not handled in CMake build, seeing as CMake FindEXPAT
 # explicitly relies on the existence of "expat.h" to find includes directory.
+if(EXPAT)
+  list(APPEND basic_include_dirs ${EXPAT_INCLUDE_DIRS})
+  list(APPEND basic_libs ${EXPAT_LIBRARIES})
+endif()
+
+if(CURL AND CURL_VERSION_STRING VERSION_GREATER_EQUAL "7.9.8" AND EXPAT)
+  list(APPEND program_src "${CMAKE_CURRENT_SOURCE_DIR}/http-push.c")
+endif()
+
+if(CURL AND CURL_VERSION_STRING VERSION_GREATER_EQUAL "7.22.0")
+  list(APPEND basic_defs "-DUSE_CURL_FOR_IMAP_SEND")
+  set(imap_send_builddeps "${CMAKE_CURRENT_SOURCE_DIR}/http.c")
+  set(imap_send_libs ${CURL_LIBRARIES})
+endif()
 
 find_package(Gettext)
 find_package(Intl)
@@ -409,7 +773,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
   print_bool(FINK)
   if(FINK AND IS_DIRECTORY "/sw")
     if(IS_DIRECTORY "/sw/include")
-      list(APPEND include_dirs "/sw/include")
+      list(APPEND basic_include_dirs "/sw/include")
     endif()
     if(IS_DIRECTORY "/sw/lib")
       list(APPEND link_dirs "/sw/lib")
@@ -423,7 +787,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
   print_bool(DARWIN_PORTS)
   if(DARWIN_PORTS AND IS_DIRECTORY "/opt/local")
     if(IS_DIRECTORY "/opt/local/include")
-      list(APPEND include_dirs "/opt/local/include")
+      list(APPEND basic_include_dirs "/opt/local/include")
     endif()
     if(IS_DIRECTORY "/opt/local/lib")
       list(APPEND link_dirs "/opt/local/lib")
@@ -458,6 +822,52 @@ if(SHA1_IMPLEMENTATION STREQUAL "DC_SHA1")
 
   option(DC_SHA1_SUBMODULE "${doc_string}" OFF)
   print_bool(DC_SHA1_SUBMODULE)
+endif()
+
+if(SHA1_IMPLEMENTATION STREQUAL "OPENSSL_SHA1")
+  list(APPEND basic_include_dirs ${OPENSSL_INCLUDE_DIRS})
+  list(APPEND basic_libs ${OPENSSL_LIBRARIES})
+  list(APPEND basic_defs "-DSHA1_OPENSSL")
+elseif(SHA1_IMPLEMENTATION STREQUAL "BLK_SHA1")
+  list(APPEND lib_src "${CMAKE_CURRENT_SOURCE_DIR}/block-sha1/sha1.c")
+  list(APPEND basic_defs "-DSHA1_BLK")
+elseif(SHA1_IMPLEMENTATION STREQUAL "PPC_SHA1")
+  list(APPEND lib_src
+       "${CMAKE_CURRENT_SOURCE_DIR}/ppc/sha1.c"
+       "${CMAKE_CURRENT_SOURCE_DIR}/ppc/sha1ppc.c")
+  list(APPEND basic_defs "-DSHA1_PPC")
+elseif(SHA1_IMPLEMENTATION STREQUAL "APPLE_COMMON_CRYPTO")
+  list(APPEND compat_defs "-DCOMMON_DIGEST_FOR_OPENSSL")
+  list(APPEND basic_defs "-DSHA1_APPLE")
+else()
+  if(NOT SHA1_IMPLEMENTATION STREQUAL "DC_SHA1")
+    message(FATAL_ERROR "Invalid SHA1_IMPLEMENTATION: ${SHA1_IMPLEMENTATION}")
+  endif()
+  list(APPEND basic_defs "-DSHA1_DC")
+  list(APPEND lib_src "${CMAKE_CURRENT_SOURCE_DIR}/sha1dc_git.c")
+
+  if(DC_SHA1_EXTERNAL)
+    if(DC_SHA1_SUBMODULE)
+      message(FATAL_ERROR
+        "Only set DC_SHA1_EXTERNAL or DC_SHA1_SUBMODULE, not both")
+    endif()
+    list(APPEND basic_defs "-DDC_SHA1_EXTERNAL")
+    list(APPEND basic_libs sha1detectcoll)
+  elseif(DC_SHA1_SUBMODULE)
+    list(APPEND lib_src
+         "${CMAKE_CURRENT_SOURCE_DIR}/sha1collisiondetection/lib/sha1.c"
+         "${CMAKE_CURRENT_SOURCE_DIR}/sha1collisiondetection/lib/ubc_check.c")
+    list(APPEND basic_defs "-DDC_SHA1_SUBMODULE")
+  else()
+    list(APPEND lib_src
+         "${CMAKE_CURRENT_SOURCE_DIR}/sha1collisiondetection/sha1.c"
+         "${CMAKE_CURRENT_SOURCE_DIR}/sha1collisiondetection/ubc_check.c")
+  endif()
+  list(APPEND basic_defs
+       "-DSHA1DC_NO_STANDARD_INCLUDES"
+       "-DSHA1DC_INIT_SAFE_HASH_DEFAULT=0"
+       "-DSHA1DC_CUSTOM_INCLUDE_SHA1_C=\"cache.h\""
+       "-DSHA1DC_CUSTOM_INCLUDE_UBC_CHECK_C=\"git-compat-util.h\"")
 endif()
 
 set(CMAKE_EXTRA_INCLUDE_FILES "stdint.h")
@@ -542,9 +952,15 @@ set(CMAKE_EXTRA_INCLUDE_FILES)
 
 find_package(ZLIB)
 if(ZLIB_FOUND)
+  list(APPEND basic_include_dirs ${ZLIB_INCLUDE_DIRS})
+  list(APPEND basic_libs ${ZLIB_LIBRARIES})
+
   set(CMAKE_REQUIRED_LIBRARIES "${ZLIB_LIBRARIES}")
   check_function_exists(deflateBound DEFLATE_BOUND)
   set(CMAKE_REQUIRED_LIBRARIES)
+  if(NOT DEFLATE_BOUND)
+    list(APPEND basic_defs "-DNO_DEFLATE_BOUND")
+  endif()
 endif()
 print_bool(DEFLATE_BOUND)
 
@@ -742,9 +1158,9 @@ try_compile(USE_PARENS_AROUND_GETTEXT_N
   SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/cmake/parens_test.c")
 print_bool(USE_PARENS_AROUND_GETTEXT_N)
 if(USE_PARENS_AROUND_GETTEXT_N)
-  list(APPEND defs "-DUSE_PARENS_AROUND_GETTEXT_N=1")
+  list(APPEND basic_defs "-DUSE_PARENS_AROUND_GETTEXT_N=1")
 else()
-  list(APPEND defs "-DUSE_PARENS_AROUND_GETTEXT_N=0")
+  list(APPEND basic_defs "-DUSE_PARENS_AROUND_GETTEXT_N=0")
 endif()
 
 try_compile(HAVE_BSD_SYSCTL
