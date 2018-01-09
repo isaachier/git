@@ -520,14 +520,15 @@ endif()
 print_bool(SNPRINTF_RETURNS_BOGUS)
 if(SNPRINTF_RETURNS_BOGUS)
   list(APPEND compat_defs "-DSNPRINTF_RETURNS_BOGUS")
+  list(APPEND compat_src "${CMAKE_CURRENT_SOURCE_DIR}/compat/snprintf.c")
 endif()
 
 if(NOT CMAKE_CROSSCOMPILING)
   try_run(fopen_dir_run_result
           fopen_dir_compile_result
-          COMPILE_OUTPUT_VARIABLE fopen_dir_compile_output
           "${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/CMakeTmp"
           "${CMAKE_CURRENT_SOURCE_DIR}/cmake/fopen_dir_test.c"
+          COMPILE_OUTPUT_VARIABLE fopen_dir_compile_output
           ARGS "${CMAKE_CURRENT_SOURCE_DIR}")
   if(fopen_dir_compile_result)
     if(fopen_dir_run_result EQUAL 0)
@@ -541,6 +542,7 @@ endif()
 print_bool(FREAD_READS_DIRECTORIES)
 if(FREAD_READS_DIRECTORIES)
   list(APPEND compat_defs "-DFREAD_READS_DIRECTORIES")
+  list(APPEND compat_src "${CMAKE_CURRENT_SOURCE_DIR}/compat/fopen.c")
 endif()
 
 find_package(OpenSSL)
@@ -571,8 +573,8 @@ if(PCRE_VERSION)
 
   if(PCRE_INCLUDE_DIR AND PCRE_LIBRARY)
     list(APPEND basic_defs "-DUSE_LIBPCRE${PCRE_VERSION}")
-    list(APPEND basic_include_dirs ${PCRE_INCLUDE_DIR})
-    list(APPEND basic_libs ${PCRE_LIBRARY})
+    list(APPEND include_dirs ${PCRE_INCLUDE_DIR})
+    list(APPEND libs ${PCRE_LIBRARY})
 
     if(PCRE_VERSION STREQUAL "1" AND PCRE_LIBRARY)
       check_symbol_exists(PCRE_JIT_CONFIG "pcre.h" has_jit)
@@ -611,8 +613,8 @@ cmake_dependent_option(EXPAT "Enable expat for HTTP parsing" ON
 # EXPAT_NEEDS_XMLPARSE_H not handled in CMake build, seeing as CMake FindEXPAT
 # explicitly relies on the existence of "expat.h" to find includes directory.
 if(EXPAT)
-  list(APPEND basic_include_dirs ${EXPAT_INCLUDE_DIRS})
-  list(APPEND basic_libs ${EXPAT_LIBRARIES})
+  list(APPEND include_dirs ${EXPAT_INCLUDE_DIRS})
+  list(APPEND libs ${EXPAT_LIBRARIES})
 endif()
 
 if(CURL AND CURL_VERSION_STRING VERSION_GREATER_EQUAL "7.9.8" AND EXPAT)
@@ -622,7 +624,7 @@ endif()
 if(CURL AND CURL_VERSION_STRING VERSION_GREATER_EQUAL "7.22.0")
   list(APPEND basic_defs "-DUSE_CURL_FOR_IMAP_SEND")
   set(imap_send_builddeps "${CMAKE_CURRENT_SOURCE_DIR}/http.c")
-  set(imap_send_libs ${CURL_LIBRARIES})
+  set(libs ${CURL_LIBRARIES})
 endif()
 
 find_package(Gettext)
@@ -631,17 +633,18 @@ cmake_dependent_option(GETTEXT "Translate git output" ON
                        "GETTEXT_FOUND;Intl_FOUND" OFF)
 
 if(NOT GETTEXT)
+  list(APPEND basic_defs "-DNO_GETTEXT")
   set(no_gettext ON)
 endif()
 cmake_dependent_option(USE_GETTEXT_SCHEME_FALLTHROUGH "${doc_string}" OFF
                        "no_gettext" ON)
-
 if(GETTEXT)
   set(doc_string "Enable if you do not trust installed gettext translation")
   set(doc_string "${doc_string} of the shell scripts output")
 
   check_include_file("libcharset.h" HAVE_LIBCHARSET_H)
   if(HAVE_LIBCHARSET_H)
+    list(APPEND basic_defs "-DHAVE_LIBCHARSET_H")
     check_library_exists(charset locale_charset "" have_libcharset)
     if(have_libcharset)
       set(CHARSET_LIB charset)
@@ -653,11 +656,13 @@ if(GETTEXT)
         message(FATAL_ERROR "Cannot find library that defines locale_charset")
       endif()
     endif()
+    list(APPEND libs ${CHARSET_LIB})
   endif()
 
   check_function_exists(nl_langinfo LIBC_CONTAINS_LIBINTL)
   print_bool(LIBC_CONTAINS_LIBINTL)
   if(NOT LIBC_CONTAINS_LIBINTL)
+    list(APPEND libs ${Intl_LIBRARY})
     set(CMAKE_REQUIRED_LIBRARIES "${Intl_LIBRARY}")
     check_function_exists(nl_langinfo nl_langinfo_found)
     if(NOT nl_langinfo_found)
@@ -671,6 +676,15 @@ endif()
 
 check_include_file("paths.h" HAVE_PATHS_H)
 print_bool(HAVE_PATHS_H)
+if(HAVE_PATHS_H)
+  list(APPEND basic_defs "-DHAVE_PATHS_H")
+endif()
+
+check_include_file("inttypes.h" HAVE_INTTYPES_H)
+print_bool(HAVE_INTTYPES_H)
+if(NOT HAVE_INTTYPES_H)
+  list(APPEND basic_defs "-DNO_INTTYPES_H")
+endif()
 
 check_symbol_exists(DT_UNKNOWN "dirent.h" have_dt_unknown)
 if(have_dt_unknown)
@@ -679,22 +693,53 @@ if(have_dt_unknown)
     set(D_TYPE_IN_DIRENT ON)
   endif()
   print_bool(D_TYPE_IN_DIRENT)
+else()
+  set(D_TYPE_IN_DIRENT ON)
+endif()
+
+if(NOT D_TYPE_IN_DIRENT)
+  list(APPEND basic_defs "-DNO_D_TYPE_IN_DIRENT")
 endif()
 
 check_include_file("strings.h" HAVE_STRINGS_H)
 print_bool(HAVE_STRINGS_H)
+if(HAVE_STRINGS_H)
+  list(APPEND basic_defs "-DHAVE_STRINGS_H")
+endif()
 
 check_function_exists(strcasestr STRCASESTR)
 print_bool(STRCASESTR)
+if(NOT STRCASESTR)
+  list(APPEND compat_defs "-DNO_STRCASESTR")
+  list(APPEND compat_src "${CMAKE_CURRENT_SOURCE_DIR}/compat/strcasestr.c")
+endif()
+
+check_function_exists(hstrerror HSTRERROR)
+print_bool(HSTRERROR)
+if(NOT HSTRERROR)
+  list(APPEND compat_defs "-DNO_HSTRERROR")
+  list(APPEND compat_src "${CMAKE_CURRENT_SOURCE_DIR}/compat/hstrerror.c")
+endif()
 
 check_function_exists(memmem MEMMEM)
 print_bool(MEMMEM)
+if(NOT MEMMEM)
+  list(APPEND compat_defs "-DNO_MEMMEM")
+  list(APPEND compat_src "${CMAKE_CURRENT_SOURCE_DIR}/compat/memmem.c")
+endif()
 
 check_function_exists(getpagesize GETPAGESIZE)
 print_bool(GETPAGESIZE)
+if(NOT GETPAGESIZE)
+  list(APPEND compat_defs "-DNO_GETPAGESIZE")
+endif()
 
 check_function_exists(strlcpy STRLCPY)
 print_bool(STRLCPY)
+if(NOT STRLCPY)
+  list(APPEND compat_defs "-DNO_STRLCPY")
+  list(APPEND compat_src "${CMAKE_CURRENT_SOURCE_DIR}/compat/strlcpy.c")
+endif()
 
 check_function_exists(strtoimax have_strtoimax)
 if(NOT have_strtoimax)
@@ -704,15 +749,45 @@ if(have_strtoimax OR have_strtoumax)
   set(STRTOUMAX ON)
 endif()
 print_bool(STRTOUMAX)
+if(NOT STRTOUMAX)
+  list(APPEND compat_defs "-DNO_STRTOUMAX")
+  list(APPEND compat_src
+       "${CMAKE_CURRENT_SOURCE_DIR}/compat/strtoumax.c"
+       "${CMAKE_CURRENT_SOURCE_DIR}/compat/strtoimax.c")
+endif()
+
+check_function_exists(strtoull STRTOULL)
+print_bool(STRTOULL)
+if(NOT STRTOULL)
+  list(APPEND compat_defs "-DNO_STRTOULL")
+endif()
 
 check_function_exists(setenv SETENV)
 print_bool(SETENV)
+if(NOT SETENV)
+  list(APPEND compat_defs "-DNO_SETENV")
+  list(APPEND compat_src "${CMAKE_CURRENT_SOURCE_DIR}/compat/setenv.c")
+endif()
 
 check_function_exists(unsetenv UNSETENV)
 print_bool(UNSETENV)
+if(NOT UNSETENV)
+  list(APPEND compat_defs "-DNO_UNSETENV")
+  list(APPEND compat_src "${CMAKE_CURRENT_SOURCE_DIR}/compat/unsetenv.c")
+endif()
 
 check_function_exists(mkdtemp MKDTEMP)
 print_bool(MKDTEMP)
+if(NOT MKDTEMP)
+  list(APPEND compat_defs "-DNO_MKDTEMP")
+  list(APPEND compat_src "${CMAKE_CURRENT_SOURCE_DIR}/compat/mkdtemp.c")
+endif()
+
+check_function_exists(initgroups INITGROUPS)
+print_bool(INITGROUPS)
+if(NOT INITGROUPS)
+  list(APPEND compat_defs "-DNO_INITGROUPS")
+endif()
 
 if(NOT CMAKE_CROSSCOMPILING)
   set(test_dir_path "${CMAKE_CURRENT_BINARY_DIR}/mkdir_test_dir")
@@ -732,14 +807,22 @@ if(NOT CMAKE_CROSSCOMPILING)
   endif()
 endif()
 print_bool(MKDIR_W_TRAILING_SLASH)
+if(NOT MKDIR_W_TRAILING_SLASH)
+  list(APPEND compat_defs "-DMKDIR_WO_TRAILING_SLASH")
+  list(APPEND compat_src "${CMAKE_CURRENT_SOURCE_DIR}/compat/mkdir.c")
+endif()
 
 check_struct_has_member("struct passwd" pw_gecos "pwd.h" GECOS_IN_PWENT)
 print_bool(GECOS_IN_PWENT)
+if(NOT GECOS_IN_PWENT)
+  list(APPEND basic_defs "-DNO_GECOS_IN_PWENT")
+endif()
 
 check_include_file("libgen.h" LIBGEN_H)
 print_bool(LIBGEN_H)
 if(NOT LIBGEN_H)
   list(APPEND compat_defs "-DNO_LIBGEN_H")
+  list(APPEND compat_src "${CMAKE_CURRENT_SOURCE_DIR}/compat/basename.c")
 endif()
 
 check_function_exists(dirname libc_has_dirname)
@@ -747,9 +830,15 @@ if(NOT libc_has_dirname)
   set(NEEDS_LIBGEN ON)
 endif()
 print_bool(NEEDS_LIBGEN)
+if(NEEDS_LIBGEN)
+  list(APPEND libs gen)
+endif()
 
 check_include_file("sys/select.h" SYS_SELECT_H)
 print_bool(SYS_SELECT_H)
+if(NOT SYS_SELECT_H)
+  list(APPEND basic_defs "-DNO_SYS_SELECT_H")
+endif()
 
 if(NOT WIN32)
   set(not_windows ON)
@@ -758,6 +847,9 @@ cmake_dependent_option(
   SYMLINK_HEAD "Occasionally use symbolic link for .git/HEAD" ON
   "not_windows" OFF)
 print_bool(SYMLINK_HEAD)
+if(NOT SYMLINK_HEAD)
+  list(APPEND basic_defs "-DNO_SYMLINK_HEAD")
+endif()
 
 option(SVN_TESTS "Build time-consuming SVN tests" ON)
 print_bool(SVN_TESTS)
@@ -773,7 +865,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
   print_bool(FINK)
   if(FINK AND IS_DIRECTORY "/sw")
     if(IS_DIRECTORY "/sw/include")
-      list(APPEND basic_include_dirs "/sw/include")
+      list(APPEND include_dirs "/sw/include")
     endif()
     if(IS_DIRECTORY "/sw/lib")
       list(APPEND link_dirs "/sw/lib")
@@ -787,7 +879,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
   print_bool(DARWIN_PORTS)
   if(DARWIN_PORTS AND IS_DIRECTORY "/opt/local")
     if(IS_DIRECTORY "/opt/local/include")
-      list(APPEND basic_include_dirs "/opt/local/include")
+      list(APPEND include_dirs "/opt/local/include")
     endif()
     if(IS_DIRECTORY "/opt/local/lib")
       list(APPEND link_dirs "/opt/local/lib")
@@ -799,8 +891,20 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
   if(APPLE_COMMON_CRYPTO)
     list(APPEND compat_defs "-DAPPLE_COMMON_CRYPTO")
   endif()
+endif()
 
-  # Disable REGEX?
+set(doc_string
+    "Limit the amount of data that will be hashed in one call to the "
+    "platform's SHA1_Update()")
+if(APPLE_COMMON_CRYPTO)
+  set(SHA1_MAX_BLOCK_SIZE "1024L*1024L*1024L" CACHE STRING "${doc_string}")
+else()
+  set(SHA1_MAX_BLOCK_SIZE "" CACHE STRING "${doc_string}")
+endif()
+
+if(SHA1_MAX_BLOCK_SIZE)
+  list(APPEND basic_defs "-DSHA1_MAX_BLOCK_SIZE=\"${SHA1_MAX_BLOCK_SIZE}\"")
+  list(APPEND lib_src "${CMAKE_CURRENT_SOURCE_DIR}/compat/sha1-chunked.c")
 endif()
 
 if(OPENSSL)
@@ -825,8 +929,8 @@ if(SHA1_IMPLEMENTATION STREQUAL "DC_SHA1")
 endif()
 
 if(SHA1_IMPLEMENTATION STREQUAL "OPENSSL_SHA1")
-  list(APPEND basic_include_dirs ${OPENSSL_INCLUDE_DIRS})
-  list(APPEND basic_libs ${OPENSSL_LIBRARIES})
+  list(APPEND include_dirs ${OPENSSL_INCLUDE_DIRS})
+  list(APPEND libs ${OPENSSL_LIBRARIES})
   list(APPEND basic_defs "-DSHA1_OPENSSL")
 elseif(SHA1_IMPLEMENTATION STREQUAL "BLK_SHA1")
   list(APPEND lib_src "${CMAKE_CURRENT_SOURCE_DIR}/block-sha1/sha1.c")
@@ -852,7 +956,7 @@ else()
         "Only set DC_SHA1_EXTERNAL or DC_SHA1_SUBMODULE, not both")
     endif()
     list(APPEND basic_defs "-DDC_SHA1_EXTERNAL")
-    list(APPEND basic_libs sha1detectcoll)
+    list(APPEND libs sha1detectcoll)
   elseif(DC_SHA1_SUBMODULE)
     list(APPEND lib_src
          "${CMAKE_CURRENT_SOURCE_DIR}/sha1collisiondetection/lib/sha1.c"
@@ -871,15 +975,36 @@ else()
 endif()
 
 set(CMAKE_EXTRA_INCLUDE_FILES "stdint.h")
+
 check_type_size(intptr_t INTPTR_T)
 print_bool(INTPTR_T)
+if(NOT INTPTR_T)
+  list(APPEND compat_defs "-DNO_INTPTR_T")
+endif()
+
 check_type_size(uintmax_t UINTMAX_T)
 print_bool(UINTMAX_T)
+if(NOT UINTMAX_T)
+  list(APPEND compat_defs "-Duintmax_t=uint32_t")
+endif()
+
 set(CMAKE_EXTRA_INCLUDE_FILES)
 
 check_function_exists(mmap have_mmap)
 cmake_dependent_option(MMAP "Use mmap" ON "have_mmap" OFF)
 print_bool(MMAP)
+
+cmake_dependent_option(
+  USE_WIN32_MMAP "Use Windows mmap" OFF "WIN32;MMAP" OFF)
+if(MMAP)
+  if(USE_WIN32_MMAP)
+    list(APPEND compat_defs "-DUSE_WIN32_MMAP")
+    list(APPEND compat_src "${CMAKE_CURRENT_SOURCE_DIR}/compat/win32mmap.c")
+  endif()
+else()
+  list(APPEND compat_defs "-DNO_MMAP")
+  list(APPEND compat_src "${CMAKE_CURRENT_SOURCE_DIR}/compat/mmap.c")
+endif()
 
 if(MMAP)
   if(CMAKE_CROSSCOMPILING)
@@ -905,10 +1030,26 @@ if(MMAP)
   print_bool(MMAP_PREVENTS_DELETE)
 endif()
 
-check_include_file("sys/poll.h" SYS_POLL_H)
-print_bool(SYS_POLL_H)
+if(MMAP_PREVENTS_DELETE)
+  list(APPEND basic_defs "-DMMAP_PREVENTS_DELETE")
+endif()
 
-cmake_dependent_option(POLL "Use poll()" ON "SYS_POLL_H" OFF)
+option(POLL "Use poll()" ON)
+if(POLL)
+  check_include_file("sys/poll.h" SYS_POLL_H)
+  print_bool(SYS_POLL_H)
+  if(NOT SYS_POLL_H)
+    list(APPEND basic_defs "-DNO_SYS_POLL_H")
+  endif()
+else()
+  list(APPEND compat_defs "-DNO_POLL")
+  list(APPEND compat_include_dirs "${CMAKE_CURRENT_SOURCE_DIR}/compat/poll")
+  list(APPEND compat_src "${CMAKE_CURRENT_SOURCE_DIR}/compat/poll/poll.c")
+endif()
+
+if(NOT SYS_POLL_H)
+  list(APPEND basic_defs "-DNO_SYS_POLL_H")
+endif()
 
 find_package(Threads)
 cmake_dependent_option(PTHREADS "Use pthreads" ON "CMAKE_USE_PTHREADS_INIT" OFF)
@@ -917,43 +1058,134 @@ print_bool(PTHREADS)
 check_function_exists(pread have_pread)
 cmake_dependent_option(PREAD "Use pread system call" ON "have_pread" OFF)
 print_bool(PREAD)
-
-check_function_exists(setitimer SETITIMER)
-print_bool(SETITIMER)
+if(NOT PREAD)
+  list(APPEND compat_defs "-DNO_PREAD")
+  list(APPEND compat_src "${CMAKE_CURRENT_SOURCE_DIR}/compat/pread.c")
+endif()
 
 set(CMAKE_EXTRA_INCLUDE_FILES "sys/time.h")
 check_type_size("struct itimerval" STRUCT_ITIMERVAL)
 print_bool(STRUCT_ITIMERVAL)
 set(CMAKE_EXTRA_INCLUDE_FILES)
+if(STRUCT_ITIMERVAL)
+  check_function_exists(setitimer SETITIMER)
+  print_bool(SETITIMER)
+else()
+  list(APPEND "-DNO_STRUCT_ITIMERVAL")
+endif()
+
+if(NOT SETITIMER)
+  list(APPEND compat_defs "-DNO_SETITIMER")
+endif()
 
 option(FAST_WORKING_DIRECTORY
   "Accessing working directory is faster than accessing objects in pack files"
   ON)
 print_bool(FAST_WORKING_DIRECTORY)
+if(NOT FAST_WORKING_DIRECTORY)
+  list(APPEND basic_defs "-DNO_FAST_WORKING_DIRECTORY")
+endif()
 
 option(TRUSTABLE_FILEMODE "Filesystem supports executable file mode" ON)
 print_bool(TRUSTABLE_FILEMODE)
+if(NOT TRUSTABLE_FILEMODE)
+  list(APPEND basic_defs "-DNO_TRUSTABLE_FILEMODE")
+endif()
 
 option(NEEDS_MODE_TRANSLATION
        "OS strays from the typical file type bits in mode values"
        OFF)
 print_bool(NEEDS_MODE_TRANSLATION)
+if(NEEDS_MODE_TRANSLATION)
+  list(APPEND compat_defs "-DNEEDS_MODE_TRANSLATION")
+  list(APPEND compat_src "${CMAKE_CURRENT_SOURCE_DIR}/compat/stat.c")
+endif()
 
 option(IPV6 "System supports IPv6" ON)
 print_bool(IPV6)
+if(NOT IPV6)
+  list(APPEND basic_defs "-DNO_IPV6")
+endif()
+
+check_function_exists(inet_ntop HAVE_INET_NTOP)
+if(NOT HAVE_INET_NTOP)
+  list(APPEND lib_src "${CMAKE_CURRENT_SOURCE_DIR}/compat/inet_ntop.c")
+  list(APPEND basic_defs "-DNO_INET_NTOP")
+endif()
+
+check_function_exists(inet_pton HAVE_INET_PTON)
+if(NOT HAVE_INET_PTON)
+  list(APPEND lib_src "${CMAKE_CURRENT_SOURCE_DIR}/compat/inet_pton.c")
+  list(APPEND basic_defs "-DNO_INET_PTON")
+endif()
 
 check_symbol_exists(AF_UNIX "${socket_headers}" UNIX_SOCKETS)
 print_bool(UNIX_SOCKETS)
+if(NOT UNIX_SOCKETS)
+  list(APPEND lib_src "${CMAKE_CURRENT_SOURCE_DIR}/unix-socket.c")
+  list(APPEND program_src
+       "${CMAKE_CURRENT_SOURCE_DIR}/credential-cache.c"
+       "${CMAKE_CURRENT_SOURCE_DIR}/credential-cache--daemon.c")
+endif()
 
 set(CMAKE_EXTRA_INCLUDE_FILES "${socket_headers}")
 check_type_size("struct sockaddr" SOCKADDR_STORAGE)
-print_bool(SOCKADDR_STORAGE)
 set(CMAKE_EXTRA_INCLUDE_FILES)
+print_bool(SOCKADDR_STORAGE)
+if(NOT SOCKADDR_STORAGE)
+  if(IPV6)
+    list(APPEND basic_defs "-Dsockaddr_storage=sockaddr_in6")
+  else()
+    list(APPEND basic_defs "-Dsockaddr_storage=sockaddr_in")
+  endif()
+endif()
+
+check_include_file("iconv.h" have_iconv_h)
+if(have_iconv_h)
+  try_compile(new_iconv
+    "${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/CMakeTmp"
+    SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/cmake/iconv_test.c"
+    COMPILE_DEFINITIONS "-DCONST="
+    OUTPUT_VARIABLE new_iconv_output)
+  if(NOT new_iconv)
+    try_compile(OLD_ICONV
+      "${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/CMakeTmp"
+      SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/cmake/iconv_test.c"
+      COMPILE_DEFINITIONS "-DCONST=const"
+      OUTPUT_VARIABLE old_iconv_output)
+    if(NOT OLD_ICONV)
+      message(WARNING "Cannot compile call to iconv"
+              "New iconv test output: ${new_iconv_output}"
+              "Old iconv test output: ${old_iconv_output}")
+    endif()
+  endif()
+else()
+  set(NO_ICONV ON)
+endif()
+print_bool(OLD_ICONV)
+print_bool(NO_ICONV)
+
+if(NO_ICONV)
+  list(APPEND basic_defs "-DNO_ICONV")
+endif()
+
+if(OLD_ICONV)
+  list(APPEND basic_defs "-DOLD_ICONV")
+endif()
+
+if(UNIX)
+  set(POSIX_GOODIES ON)
+endif()
+print_bool(POSIX_GOODIES)
+
+if(NOT POSIX_GOODIES)
+  list(APPEND basic_defs "-DNO_POSIX_GOODIES")
+endif()
 
 find_package(ZLIB)
 if(ZLIB_FOUND)
-  list(APPEND basic_include_dirs ${ZLIB_INCLUDE_DIRS})
-  list(APPEND basic_libs ${ZLIB_LIBRARIES})
+  list(APPEND include_dirs ${ZLIB_INCLUDE_DIRS})
+  list(APPEND libs ${ZLIB_LIBRARIES})
 
   set(CMAKE_REQUIRED_LIBRARIES "${ZLIB_LIBRARIES}")
   check_function_exists(deflateBound DEFLATE_BOUND)
@@ -966,41 +1198,35 @@ print_bool(DEFLATE_BOUND)
 
 option(NORETURN "Use of attribute((__noreturn__))" ON)
 print_bool(NORETURN)
+if(NOT NORETURN)
+  list(APPEND basic_defs "-DNO_NORETURN")
+endif()
 
 check_struct_has_member("struct stat" st_ctimespec "sys/stat.h" USE_ST_TIMESPEC)
 print_bool(USE_ST_TIMESPEC)
+if(USE_ST_TIMESPEC)
+  list(APPEND basic_defs "-DUSE_ST_TIMESPEC")
+endif()
 
 check_struct_has_member("struct stat" "st_ctim.tv_nsec" "sys/stat.h" HAVE_NSEC)
 print_bool(HAVE_NSEC)
+if(NOT HAVE_NSEC)
+  list(APPEND basic_defs "-DNO_NSEC")
+endif()
 
 cmake_dependent_option(
   USE_NSEC "Use subsecond file mtimes and ctimes" OFF "HAVE_NSEC" OFF)
 print_bool(USE_NSEC)
-
-option(USE_STDEV
-       "Consider underlying device change as inode change for update-index"
-       OFF)
-print_bool(USE_STDEV)
+if(USE_NSEC)
+  list(APPEND basic_defs "-DUSE_NSEC")
+endif()
 
 check_struct_has_member(
   "struct stat" st_blocks "sys/stat.h" ST_BLOCKS_IN_STRUCT_STAT)
 print_bool(ST_BLOCKS_IN_STRUCT_STAT)
-
-option(DOCBOOK_XSL_172 "Format man pages with DocBook XSL v1.72" OFF)
-print_bool(DOCBOOK_XSL_172)
-
-option(ASCIIDOC_ROFF "DocBook XSL does not escape raw roff directives" OFF)
-print_bool(ASCIIDOC_ROFF)
-
-option(GNU_ROFF "Target system uses GNU groff" OFF)
-print_bool(GNU_ROFF)
-
-option(USE_ASCIIDOCTOR "Use Asciidoctor instead of Asciidoc" OFF)
-print_bool(USE_ASCIIDOCTOR)
-
-set(ASCIIDOCTOR_EXTENSIONS_LAB "" CACHE STRING
-    "Location of Asciidoctor Extensions Lab")
-message(STATUS "ASCIIDOCTOR_EXTENSIONS_LAB: ${ASCIIDOCTOR_EXTENSIONS_LAB}")
+if(NOT ST_BLOCKS_IN_STRUCT_STAT)
+  list(APPEND basic_defs "-DNO_ST_BLOCKS_IN_STRUCT_STAT")
+endif()
 
 find_program(PERL_PATH perl)
 message(STATUS "PERL_PATH: ${PERL_PATH}")
@@ -1034,9 +1260,18 @@ message(STATUS "SANE_TEXT_GREP: ${SANE_TEXT_GREP}")
 
 option(INTERNAL_QSORT "Use git's internal qsort" OFF)
 print_bool(INTERNAL_QSORT)
+if(INTERNAL_QSORT)
+  list(APPEND compat_defs "-DINTERNAL_QSORT")
+  list(APPEND compat_src "${CMAKE_CURRENT_SOURCE_DIR}/compat/qsort.c")
+endif()
 
 check_function_exists(qsort_s HAVE_ISO_QSORT_S)
 print_bool(HAVE_ISO_QSORT_S)
+if(HAVE_ISO_QSORT_S)
+  list(APPEND compat_defs "-DHAVE_ISO_QSORT_S")
+else()
+  list(APPEND compat_src "${CMAKE_CURRENT_SOURCE_DIR}/compat/qsort_s.c")
+endif()
 
 if(NOT CMAKE_CROSSCOMPILING)
   try_run(fstat_run_result
@@ -1054,6 +1289,9 @@ if(NOT CMAKE_CROSSCOMPILING)
   endif()
 endif()
 print_bool(UNRELIABLE_FSTAT)
+if(UNRELIABLE_FSTAT)
+  list(APPEND basic_defs "-DUNRELIABLE_FSTAT")
+endif()
 
 cmake_dependent_option(
   OBJECT_CREATION_USES_RENAMES
@@ -1062,10 +1300,20 @@ cmake_dependent_option(
   "not_windows"
   ON)
 print_bool(OBJECT_CREATION_USES_RENAMES)
+if(OBJECT_CREATION_USES_RENAMES)
+  list(APPEND compat_defs "-DOBJECT_CREATION_MODE=1")
+endif()
 
 option(
   USE_NED_ALLOCATOR "Use nedmalloc allocator instead of platform allocator" OFF)
 print_bool(USE_NED_ALLOCATOR)
+
+if(USE_NED_ALLOCATOR)
+  list(APPEND compat_include_dirs
+       "${CMAKE_CURRENT_SOURCE_DIR}/compat/nedmalloc")
+  list(APPEND compat_src
+       "${CMAKE_CURRENT_SOURCE_DIR}/compat/nedmallloc/nedmalloc.c")
+endif()
 
 if(NOT USE_NED_ALLOCATOR)
   set(not_use_ned_allocator ON)
@@ -1074,8 +1322,18 @@ cmake_dependent_option(
   OVERRIDE_STRDUP "Override libc strdup" OFF "not_use_ned_allocator" ON)
 print_bool(OVERRIDE_STRDUP)
 
+if(OVERRIDE_STRDUP)
+  list(APPEND compat_defs "-DOVERRIDE_STRDUP")
+  list(APPEND compat_src "${CMAKE_CURRENT_SOURCE_DIR}/compat/strdup.c")
+endif()
+
 check_symbol_exists(REG_STARTEND "regex.h" REGEX)
 print_bool(REGEX)
+
+if(NOT REGEX)
+  list(APPEND compat_include_dirs "${CMAKE_CURRENT_SOURCE_DIR}/compat/regex")
+  list(APPEND compat_src "${CMAKE_CURRENT_SOURCE_DIR}/compat/regex/regex.c")
+endif()
 
 if(CMAKE_SYSTEM_NAME MATCHES "Linux|Darwin|SunOS")
   set(default_have_dev_tty ON)
@@ -1087,26 +1345,32 @@ option(
   "System can open /dev/tty to interact with user"
   ${default_have_dev_tty})
 print_bool(HAVE_DEV_TTY)
+if(HAVE_DEV_TTY)
+  list(APPEND basic_defs "-DHAVE_DEV_TTY")
+endif()
 
 option(GETTEXT_POISON "Debug choice of strings marked for translation" OFF)
 print_bool(GETTEXT_POISON)
-
-set(JSMIN "" CACHE FILEPATH "Path to JavaScript minifier for gitweb.js")
-message(STATUS "JSMIN: ${JSMIN}")
-
-set(CSSMIN "" CACHE FILEPATH "Path to CSS minifier for gitweb.css")
-message(STATUS "CSSMIN: ${CSSMIN}")
+if(GETTEXT_POISON)
+  list(APPEND basic_defs "-DGETTEXT_POISON")
+endif()
 
 find_program(LESS_PATH less)
 set(DEFAULT_PAGER "${LESS_PATH}" CACHE FILEPATH "Sensible pager command")
+list(APPEND basic_defs "-DDEFAULT_PAGER=${DEFAULT_PAGER}")
 
 find_program(VI_PATH vi)
 set(DEFAULT_EDITOR "${VI_PATH}" CACHE FILEPATH "Sensible editor command")
+list(APPEND basic_defs "-DDEFAULT_EDITOR=${DEFAULT_EDITOR}")
 
 if(WIN32 OR MINGW)
   set(NATIVE_CRLF ON)
 endif()
 print_bool(NATIVE_CRLF)
+
+if(NATIVE_CRLF)
+  list(APPEND basic_defs "-DNATIVE_CRLF")
+endif()
 
 set(GIT_USER_AGENT "git/${PROJECT_VERSION}" CACHE STRING
     "User-agent used for network interactions")
@@ -1116,6 +1380,7 @@ set(help_formats man info html)
 set(DEFAULT_HELP_FORMAT "man" CACHE FILEPATH "\"git help\" format")
 set_property(CACHE DEFAULT_HELP_FORMAT PROPERTY STRINGS "${help_formats}")
 message(STATUS "DEFAULT_HELP_FORMAT: ${DEFAULT_HELP_FORMAT}")
+list(APPEND basic_defs "-DDEFAULT_HELP_FORMAT=${DEFAULT_HELP_FORMAT}")
 
 set(TEST_GIT_INDEX_VERSION "" CACHE STRING "Version of indexfile to test")
 set_property(CACHE TEST_GIT_INDEX_VERSION PROPERTY STRINGS "2;3;4")
@@ -1136,6 +1401,11 @@ if(NOT CMAKE_CROSSCOMPILING)
 endif()
 print_bool(GMTIME_UNRELIABLE_ERRORS)
 
+if(GMTIME_UNRELIABLE_ERRORS)
+  list(APPEND compat_defs "-DGMTIME_UNRELIABLE_ERRORS")
+  list(APPEND compat_src "${CMAKE_CURRENT_SOURCE_DIR}/compat/gmtime.c")
+endif()
+
 check_function_exists(clock_gettime libc_has_clock_gettime)
 if(libc_has_clock_gettime)
   set(HAVE_CLOCK_GETTIME ON)
@@ -1150,8 +1420,20 @@ endif()
 print_bool(HAVE_CLOCK_GETTIME)
 print_bool(NEEDS_LIBRT)
 
+if(HAVE_CLOCK_GETTIME)
+  list(APPEND basic_defs "-DHAVE_CLOCK_GETTIME")
+endif()
+
+if(NEEDS_LIBRT)
+  list(APPEND libs rt)
+endif()
+
 check_symbol_exists(CLOCK_MONOTONIC "time.h" HAVE_CLOCK_MONOTONIC)
 print_bool(HAVE_CLOCK_MONOTONIC)
+
+if(HAVE_CLOCK_MONOTONIC)
+  list(APPEND basic_defs "-DHAVE_CLOCK_MONOTONIC")
+endif()
 
 try_compile(USE_PARENS_AROUND_GETTEXT_N
   "${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/CMakeTmp"
@@ -1168,16 +1450,26 @@ try_compile(HAVE_BSD_SYSCTL
   SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/cmake/sysctl_test.c")
 print_bool(HAVE_BSD_SYSCTL)
 
+if(HAVE_BSD_SYSCTL)
+  list(APPEND basic_defs "-DHAVE_BSD_SYSCTL")
+endif()
+
 check_function_exists(getdelim HAVE_GETDELIM)
 print_bool(HAVE_GETDELIM)
+
+if(HAVE_GETDELIM)
+  list(APPEND basic_defs "-DHAVE_GETDELIM")
+endif()
 
 set(doc_string "SP separated VAR=VAL pairs to define default environment")
 set(doc_string "${doc_string} variables to be passed when a pager is spawned")
 set(PAGER_ENV "LESS=FRX LV=-c" CACHE STRING "${doc_string}")
 message(STATUS "PAGER_ENV: ${PAGER_ENV}")
+list(APPEND basic_defs "-DPAGER_ENV=${PAGER_ENV}")
 
 find_program(SHELL_PATH sh)
 message(STATUS "SHELL_PATH: ${SHELL_PATH}")
+list(APPEND basic_defs "-DSHELL_PATH=${SHELL_PATH}")
 
 find_program(DIFF diff)
 message(STATUS "DIFF: ${DIFF}")
