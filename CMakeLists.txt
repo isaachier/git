@@ -637,6 +637,12 @@ find_package(Intl)
 cmake_dependent_option(GETTEXT "Translate git output" ON
                        "GETTEXT_FOUND;Intl_FOUND" OFF)
 
+find_library(iconv_lib NAMES iconv libiconv libiconv-2)
+if(NOT iconv_lib)
+  # Clear to avoid linking against "iconv-NOTFOUND"
+  set(iconv_lib)
+endif()
+
 if(NOT GETTEXT)
   list(APPEND basic_defs "-DNO_GETTEXT")
   set(no_gettext ON)
@@ -653,10 +659,10 @@ if(GETTEXT)
     check_library_exists(charset locale_charset "" have_libcharset)
     if(have_libcharset)
       set(CHARSET_LIB charset)
-    else()
-      check_library_exists(iconv locale_charset "" have_locale_charset_libiconv)
+    elseif(iconv_lib)
+      check_library_exists(${iconv_lib} locale_charset "" have_locale_charset_libiconv)
       if(have_locale_charset_libiconv)
-        set(CHARSET_LIB iconv)
+        set(CHARSET_LIB ${iconv_lib})
       else()
         message(FATAL_ERROR "Cannot find library that defines locale_charset")
       endif()
@@ -1158,12 +1164,14 @@ if(have_iconv_h)
     "${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/CMakeTmp"
     SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/cmake/iconv_test.c"
     COMPILE_DEFINITIONS "-DCONST="
+    LINK_LIBRARIES "${iconv_lib}"
     OUTPUT_VARIABLE new_iconv_output)
   if(NOT new_iconv)
     try_compile(OLD_ICONV
       "${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/CMakeTmp"
       SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/cmake/iconv_test.c"
       COMPILE_DEFINITIONS "-DCONST=const"
+      LINK_LIBRARIES "${iconv_lib}"
       OUTPUT_VARIABLE old_iconv_output)
     if(NOT OLD_ICONV)
       message(WARNING "Cannot compile call to iconv"
