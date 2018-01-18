@@ -77,6 +77,8 @@ macro(add_c_flag c_flags flag)
   endif()
 endmacro()
 
+# Sources defined here to append to during configuration stage.
+
 set(program_src
     "${CMAKE_CURRENT_SOURCE_DIR}/credential-store.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/daemon.c"
@@ -437,6 +439,9 @@ if(DEVELOPER)
     add_c_flag(CMAKE_C_FLAGS "${flag}")
   endforeach()
 endif()
+
+# Force RUNTIME_PREFIX for relocatable build
+set(compat_defs "-DRUNTIME_PREFIX")
 
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
@@ -1055,6 +1060,13 @@ find_package(Threads)
 cmake_dependent_option(PTHREADS "Use pthreads" ON "CMAKE_USE_PTHREADS_INIT" OFF)
 print_bool(PTHREADS)
 
+if(PTHREADS)
+  list(APPEND libs Threads::Threads)
+  list(APPEND lib_src "${CMAKE_CURRENT_SOURCE_DIR}/thread-utils.c")
+else()
+  list(APPEND basic_defs "-DNO_PTHREADS")
+endif()
+
 check_function_exists(pread have_pread)
 cmake_dependent_option(PREAD "Use pread system call" ON "have_pread" OFF)
 print_bool(PREAD)
@@ -1357,11 +1369,13 @@ endif()
 
 find_program(LESS_PATH less)
 set(DEFAULT_PAGER "${LESS_PATH}" CACHE FILEPATH "Sensible pager command")
-list(APPEND basic_defs "-DDEFAULT_PAGER=${DEFAULT_PAGER}")
+list(APPEND basic_defs "-DDEFAULT_PAGER=\"${DEFAULT_PAGER}\"")
+message(STATUS "DEFAULT_PAGER: ${DEFAULT_PAGER}")
 
 find_program(VI_PATH vi)
 set(DEFAULT_EDITOR "${VI_PATH}" CACHE FILEPATH "Sensible editor command")
-list(APPEND basic_defs "-DDEFAULT_EDITOR=${DEFAULT_EDITOR}")
+list(APPEND basic_defs "-DDEFAULT_EDITOR=\"${DEFAULT_EDITOR}\"")
+message(STATUS "DEFAULT_EDITOR: ${DEFAULT_EDITOR}")
 
 if(WIN32 OR MINGW)
   set(NATIVE_CRLF ON)
@@ -1470,6 +1484,38 @@ list(APPEND basic_defs "-DPAGER_ENV=${PAGER_ENV}")
 find_program(SHELL_PATH sh)
 message(STATUS "SHELL_PATH: ${SHELL_PATH}")
 list(APPEND basic_defs "-DSHELL_PATH=${SHELL_PATH}")
+
+# Build rules
+
+list(APPEND lib_src ${compat_src})
+list(APPEND basic_defs ${compat_defs})
+
+add_library(libgit STATIC ${lib_src})
+target_compile_definitions(libgit PUBLIC ${basic_defs})
+
+set(src_defs
+    "GIT_EXEC_PATH=\"${git_exec_dir}\""
+    "BINDIR=\"${bin_dir}\""
+    "PREFIX=\"${CMAKE_INSTALL_PREFIX}\"")
+set_source_files_properties(
+  "${CMAKE_CURRENT_SOURCE_DIR}/exec_cmd.c"
+  PROPERTIES
+  COMPILE_DEFINITIONS "${src_defs}")
+
+set_source_files_properties(
+  "${CMAKE_CURRENT_SOURCE_DIR}/builtin/init-db.c"
+  PROPERTIES
+  COMPILE_DEFINITIONS "DEFAULT_GIT_TEMPLATE_DIR=\"${template_dir}\"")
+
+set_source_files_properties(
+  "${CMAKE_CURRENT_SOURCE_DIR}/config.c"
+  PROPERTIES
+  COMPILE_DEFINITIONS "ETC_GITCONFIG=\"${etc_gitconfig}\"")
+
+set_source_files_properties(
+  "${CMAKE_CURRENT_SOURCE_DIR}/attr.c"
+  PROPERTIES
+  COMPILE_DEFINITIONS "ETC_GITATTRIBUTES=\"${etc_gitattributes}\"")
 
 find_program(DIFF diff)
 message(STATUS "DIFF: ${DIFF}")
