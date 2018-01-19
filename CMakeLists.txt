@@ -637,10 +637,9 @@ find_package(Intl)
 cmake_dependent_option(GETTEXT "Translate git output" ON
                        "GETTEXT_FOUND;Intl_FOUND" OFF)
 
-find_library(iconv_lib NAMES iconv libiconv libiconv-2)
-if(NOT iconv_lib)
-  # Clear to avoid linking against "iconv-NOTFOUND"
-  set(iconv_lib)
+find_library(iconv_lib_path NAMES iconv libiconv libiconv-2)
+if(iconv_lib_path)
+  set(iconv_lib ${iconv_lib_path})
 endif()
 
 if(NOT GETTEXT)
@@ -1164,14 +1163,14 @@ if(have_iconv_h)
     "${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/CMakeTmp"
     SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/cmake/iconv_test.c"
     COMPILE_DEFINITIONS "-DCONST="
-    LINK_LIBRARIES "${iconv_lib}"
+    LINK_LIBRARIES $<$<BOOL:${iconv_lib}>:${iconv_lib}>
     OUTPUT_VARIABLE new_iconv_output)
   if(NOT new_iconv)
     try_compile(OLD_ICONV
       "${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/CMakeTmp"
       SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/cmake/iconv_test.c"
       COMPILE_DEFINITIONS "-DCONST=const"
-      LINK_LIBRARIES "${iconv_lib}"
+      LINK_LIBRARIES $<$<BOOL:${iconv_lib}>:${iconv_lib}>
       OUTPUT_VARIABLE old_iconv_output)
     if(NOT OLD_ICONV)
       message(WARNING "Cannot compile call to iconv"
