@@ -454,9 +454,6 @@ if(DEVELOPER)
   endforeach()
 endif()
 
-# Force RUNTIME_PREFIX for relocatable build
-set(compat_defs "-DRUNTIME_PREFIX")
-
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
 set(SANITIZE "" CACHE STRING "Comma-delimited list of sanitizer flags")
@@ -1630,6 +1627,21 @@ if(CURL)
     add_executable(git-remote-http "remote-curl.c" "http.c" "http-walker.c")
     target_link_libraries(git-remote-http PUBLIC
       ${CURL_LIBRARIES} ${EXPAT_LIBRARIES} common-main)
+    foreach(remote_curl_alias "git-remote-https" "git-remote-ftp"
+            "git-remote-ftps")
+      if(UNIX)
+        set(cmake_subcommand "create_symlink")
+      else()
+        set(cmake_subcommand "copy")
+      endif()
+      add_custom_command(
+        TARGET git-remote-http
+        POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E ${cmake_subcommand}
+                git-remote-http "${remote_curl_alias}"
+        VERBATIM
+        WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}")
+    endforeach()
   endif()
 endif()
 
@@ -1638,8 +1650,27 @@ target_link_libraries(git-remote-testsvn PUBLIC common-main vcssvn)
 
 foreach(src ${program_src})
   get_filename_component(base "${src}" NAME_WE)
-  add_executable(git-${base} "${src}")
-  target_link_libraries(git-${base} PUBLIC common-main)
+  add_executable("git-${base}" "${src}")
+  target_link_libraries("git-${base}" PUBLIC common-main)
+endforeach()
+
+foreach(src ${builtin_src})
+  get_filename_component(base "${src}" NAME_WE)
+  if(UNIX)
+    set(cmake_subcommand "create_symlink")
+  else()
+    set(cmake_subcommand "copy")
+  endif()
+
+  set(src "git")
+  set(dst "git-${base}")
+  add_custom_command(
+    TARGET git POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E ${cmake_subcommand} "${src}" "${dst}"
+    VERBATIM
+    WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}")
+  install(PROGRAMS "${CMAKE_CURRENT_BINARY_DIR}/${dst}"
+          DESTINATION "${bin_dir}")
 endforeach()
 
 # Scripts
