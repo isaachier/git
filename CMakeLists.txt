@@ -562,7 +562,11 @@ if(FREAD_READS_DIRECTORIES)
 endif()
 
 find_package(OpenSSL)
-cmake_dependent_option(OPENSSL "Use OpenSSL" ON "OPENSSL_FOUND" OFF)
+cmake_dependent_option(
+  OPENSSL "Use OpenSSL" ON "OPENSSL_FOUND;not_apple_common_crypto" OFF)
+if(NOT OPENSSL)
+  list(APPEND basic_defs "-DNO_OPENSSL")
+endif()
 
 set(PCRE_VERSION "" CACHE STRING "pcre version (1 or 2), leave blank to omit")
 set_property(CACHE PCRE_VERSION PROPERTY STRINGS "1;2")
@@ -902,6 +906,8 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
   print_bool(APPLE_COMMON_CRYPTO)
   if(APPLE_COMMON_CRYPTO)
     list(APPEND compat_defs "-DAPPLE_COMMON_CRYPTO")
+  else()
+    set(not_apple_common_crypto ON)
   endif()
 endif()
 
@@ -1178,6 +1184,7 @@ if(have_iconv_h)
       message(WARNING "Cannot compile call to iconv"
               "New iconv test output: ${new_iconv_output}"
               "Old iconv test output: ${old_iconv_output}")
+      set(NO_ICONV ON)
     endif()
   endif()
 else()
@@ -1192,6 +1199,10 @@ endif()
 
 if(OLD_ICONV)
   list(APPEND basic_defs "-DOLD_ICONV")
+endif()
+
+if(NOT NO_ICONV AND iconv_lib)
+  list(APPEND libs "${iconv_lib}")
 endif()
 
 if(UNIX)
@@ -1507,6 +1518,9 @@ set(xdiff_src
   "xdiff/xpatience.c"
   "xdiff/xhistogram.c")
 add_library(xdiff STATIC ${xdiff_src})
+target_compile_definitions(xdiff PUBLIC ${basic_defs})
+target_include_directories(xdiff PUBLIC ${compat_include_dirs})
+target_link_libraries(xdiff PUBLIC ${libs})
 
 set(vcssvn_src
   "vcs-svn/line_buffer.c"
@@ -1515,6 +1529,9 @@ set(vcssvn_src
   "vcs-svn/svndiff.c"
   "vcs-svn/svndump.c")
 add_library(vcssvn STATIC ${vcssvn_src})
+target_compile_definitions(vcssvn PUBLIC ${basic_defs})
+target_include_directories(vcssvn PUBLIC ${compat_include_dirs})
+target_link_libraries(vcssvn PUBLIC ${libs})
 
 target_compile_definitions(libgit PUBLIC ${basic_defs})
 target_include_directories(libgit PUBLIC ${compat_include_dirs})
