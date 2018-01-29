@@ -17,7 +17,7 @@ BEGIN {
     $me = dirname($me);
     if (opendir(D,"$me/Generators")) {
         foreach my $gen (readdir(D)) {
-            next if ($gen  =~ /^\.\.?$/);
+            next if ($gen  =~ /^\./);
             require "${me}/Generators/$gen";
             $gen =~ s,\.pm,,;
             push(@AVAILABLE, $gen);
@@ -27,6 +27,12 @@ BEGIN {
     }
 
     push @EXPORT_OK, qw(available);
+}
+
+sub makeOptions {
+    my ($gen) = @_;
+    return eval("Generators::${gen}::makeOptions()") if grep(/^$gen$/, @AVAILABLE);
+    die "Generator \"${gen}\" is not available!\nAvailable generators are: @AVAILABLE\n";
 }
 
 sub available {

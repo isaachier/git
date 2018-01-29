@@ -12,6 +12,10 @@ BEGIN {
     push @EXPORT_OK, qw(generate);
 }
 
+sub makeOptions {
+	return "MSVC=1"
+}
+
 sub generate {
     my ($git_dir, $out_dir, $rel_dir, %build_structure) = @_;
 

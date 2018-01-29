@@ -66,6 +66,10 @@ my @GUIDS = (
     "{5728EB7E-8929-486C-8CD5-3238D060E768}"
 );
 
+sub makeOptions {
+	return "MSVC=1"
+}
+
 sub generate {
     my ($git_dir, $out_dir, $rel_dir, %build_structure) = @_;
     my @libs = @{$build_structure{"LIBS"}};

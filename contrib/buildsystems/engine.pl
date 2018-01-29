@@ -72,7 +72,8 @@ Running GNU Make to figure out build structure...
 EOM
 
 # Pipe a make --dry-run into a variable, if not already loaded from file
-@makedry = `cd $git_dir && make -n MSVC=1 V=1 2>/dev/null` if !@makedry;
+my $options = Generators::makeOptions($gen);
+@makedry = `cd $git_dir && make -n $options V=1 2>/dev/null` if !@makedry;
 
 # Parse the make output into usable info
 parseMakeOutput();
@@ -228,10 +229,70 @@ sub removeDuplicates
     @cflags = keys %dupHash;
 }
 
+sub splitTokens
+{
+    use constant {
+        DEFAULT => 0,
+        QUOTED => 1,
+        ESCAPED => 2,
+    };
+
+    my ($line) = @_;
+    my $state = DEFAULT;
+    my $prevState;
+    my $token = "";
+    my @quoteChars;
+    my $quoteChar;
+    my @tokens;
+    for my $ch (split //, $line) {
+        if ($state eq DEFAULT) {
+            if ("$ch" eq " ") {
+                $token =~ s/^\s+|\s+$//g;
+                if ($token ne "") {
+                    push(@tokens, $token);
+                    $token = "";
+                }
+            } elsif ("$ch" eq "\\") {
+                $prevState = $state;
+                $state = ESCAPED;
+            } else {
+                $token .= $ch;
+                if ("$ch" eq '"' || "$ch" eq "'") {
+                    push(@quoteChars, $ch);
+                    $state = QUOTED;
+                }
+            }
+        } elsif ($state eq QUOTED) {
+            if ("$ch" eq "\\") {
+                $prevState = $state;
+                $state = ESCAPED;
+            } else {
+                $token .= $ch;
+                $quoteChar = pop(@quoteChars);
+                if ("$ch" eq "$quoteChar") {
+                    if (!@quoteChars) {
+                        $state = DEFAULT;
+                    }
+                } else {
+                    push(@quoteChars, $quoteChar);
+                }
+            }
+        } elsif ($state eq ESCAPED) {
+            $token .= $ch;
+            $state = $prevState;
+        }
+    }
+    $token =~ s/^\s+|\s+$//g;
+    if ("$token" ne "") {
+        push(@tokens, $token);
+    }
+    return @tokens;
+}
+
 sub handleCompileLine
 {
     my ($line, $lineno) = @_;
-    my @parts = split(' ', $line);
+    my @parts = splitTokens($line);
     my $sourcefile;
     shift(@parts); # ignore cmd
     while (my $part = shift @parts) {
@@ -239,8 +300,7 @@ sub handleCompileLine
             # ignore object file
             shift @parts;
         } elsif ("$part" eq "-c") {
-            # ignore compile flag
-        } elsif ("$part" eq "-c") {
+            # ignore compile flags
         } elsif ($part =~ /^.?-I/) {
             push(@incpaths, $part);
         } elsif ($part =~ /^.?-D/) {
@@ -250,7 +310,7 @@ sub handleCompileLine
         } elsif ($part =~ /\.(c|cc|cpp)$/) {
             $sourcefile = $part;
         } else {
-            die "Unhandled compiler option @ line $lineno: $part";
+            die "Unhandled compiler option @ line $lineno: \"$part\"";
         }
     }
     @{$compile_options{"${sourcefile}_CFLAGS"}} = @cflags;
@@ -265,8 +325,8 @@ sub handleLibLine
     my (@objfiles, @lflags, $libout, $part);
     # kill cmd and rm 'prefix'
     $line =~ s/^rm -f .* && .* rcs //;
-    my @parts = split(' ', $line);
-    while ($part = shift @parts) {
+    my @parts = splitTokens($line);
+    while (my $part = shift @parts) {
         if ($part =~ /^-/) {
             push(@lflags, $part);
         } elsif ($part =~ /\.(o|obj)$/) {
@@ -284,9 +344,15 @@ sub handleLibLine
         my $sourcefile = $_;
         $sourcefile =~ s/\.o/.c/;
         push(@sources, $sourcefile);
-        push(@cflags, @{$compile_options{"${sourcefile}_CFLAGS"}});
-        push(@defines, @{$compile_options{"${sourcefile}_DEFINES"}});
-        push(@incpaths, @{$compile_options{"${sourcefile}_INCPATHS"}});
+        if (defined $compile_options{"${sourcefile}_CFLAGS}"}) {
+            push(@cflags, @{$compile_options{"${sourcefile}_CFLAGS"}});
+        }
+        if (defined $compile_options{"${sourcefile}_DEFINES"}) {
+            push(@defines, @{$compile_options{"${sourcefile}_DEFINES"}});
+        }
+        if (defined $compile_options{"${sourcefile}_INCPATHS"}) {
+            push(@incpaths, @{$compile_options{"${sourcefile}_INCPATHS"}});
+        }
     }
     removeDuplicates();
 
@@ -306,7 +372,7 @@ sub handleLinkLine
 {
     my ($line, $lineno) = @_;
     my (@objfiles, @lflags, @libs, $appout, $part);
-    my @parts = split(' ', $line);
+    my @parts = splitTokens($line);
     shift(@parts); # ignore cmd
     while ($part = shift @parts) {
         if ($part =~ /^-IGNORE/) {
@@ -338,9 +404,15 @@ sub handleLinkLine
         my $sourcefile = $_;
         $sourcefile =~ s/\.o/.c/;
         push(@sources, $sourcefile);
-        push(@cflags, @{$compile_options{"${sourcefile}_CFLAGS"}});
-        push(@defines, @{$compile_options{"${sourcefile}_DEFINES"}});
-        push(@incpaths, @{$compile_options{"${sourcefile}_INCPATHS"}});
+        if (defined $compile_options{"${sourcefile}_CFLAGS}"}) {
+            push(@cflags, @{$compile_options{"${sourcefile}_CFLAGS"}});
+        }
+        if (defined $compile_options{"${sourcefile}_DEFINES}"}) {
+            push(@defines, @{$compile_options{"${sourcefile}_DEFINES"}});
+        }
+        if (defined $compile_options{"${sourcefile}_INCPATHS}"}) {
+            push(@incpaths, @{$compile_options{"${sourcefile}_INCPATHS"}});
+        }
     }
     removeDuplicates();
 
