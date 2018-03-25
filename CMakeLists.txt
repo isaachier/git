@@ -1228,7 +1228,7 @@ if(ZLIB_FOUND)
 endif()
 print_bool(DEFLATE_BOUND)
 
-option(NORETURN "Use of attribute((__noreturn__))" ON)
+option(NORETURN "Use attribute((__noreturn__))" ON)
 print_bool(NORETURN)
 if(NOT NORETURN)
   list(APPEND basic_defs "-DNO_NORETURN")
@@ -1336,9 +1336,12 @@ if(OBJECT_CREATION_USES_RENAMES)
   list(APPEND compat_defs "-DOBJECT_CREATION_MODE=1")
 endif()
 
-option(USE_NED_ALLOCATOR
-       "Use nedmalloc allocator instead of platform allocator"
-       OFF)
+if(NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
+  set(not_debug_build ON)
+endif()
+cmake_dependent_option(
+  USE_NED_ALLOCATOR "Use nedmalloc allocator instead of platform allocator" OFF
+  "not_debug_build" OFF)
 print_bool(USE_NED_ALLOCATOR)
 
 if(USE_NED_ALLOCATOR)
@@ -1613,9 +1616,8 @@ if(USE_NED_ALLOCATOR)
   set_source_files_properties(
     "compat/nedmalloc/nedmalloc.c"
     PROPERTIES
-    COMPILE_DEFINITIONS "NDEBUG;REPLACE_SYSTEM_ALLOCATOR"
+    COMPILE_DEFINITIONS "REPLACE_SYSTEM_ALLOCATOR"
     COMPILE_FLAGS "${SPARSE_FLAGS}")
-  # TODO: Decide how this relates to Debug/Release modes
 endif()
 
 add_library(common-main "common-main.c" ${builtin_src})
@@ -1756,6 +1758,7 @@ list(APPEND script_sh "git-request-pull.sh")
 list(APPEND script_sh "git-stash.sh")
 list(APPEND script_sh "git-submodule.sh")
 list(APPEND script_sh "git-web--browse.sh")
+list(APPEND script_sh "git-instaweb.sh")
 
 list(APPEND script_lib "git-mergetool--lib.sh")
 list(APPEND script_lib "git-parse-remote.sh")
